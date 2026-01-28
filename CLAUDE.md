@@ -50,20 +50,26 @@ This project has comprehensive documentation. Reading it first will save time an
    - `file_manager.py` - File output handling
    - `lead_in.py` - Lead-in strategies (helical, ramp)
    - `corner_detection.py` - Corner analysis and feed reduction
+   - `config_writer.py` - Debug config file generation
+   - `svg_arc.py` - SVG arc parameter conversion for previews
 
 2. **Check for existing patterns** in services:
    - `web/services/project_service.py` - Project CRUD
    - `web/services/settings_service.py` - Settings management
    - `web/services/gcode_service.py` - G-code orchestration
+   - `web/services/preview_service.py` - SVG preview generation
 
 3. **Check for existing UI components** in templates:
    - `templates/partials/coord_input.html` - Coordinate input fields
    - `templates/partials/pattern_fields.html` - Pattern type selection
    - `templates/partials/modal_footer.html` - Modal buttons
+   - `templates/partials/lead_in_fields.html` - Lead-in settings fields
 
 4. **Check for existing JS utilities** in static:
    - `static/js/api.js` - API communication
    - `static/js/validation.js` - Input validation
+   - `static/js/project-editor.js` - Project editor controller
+   - `static/js/unsaved-changes.js` - Dirty state tracking
 
 ### Creating Reusable Code
 
@@ -82,6 +88,8 @@ GPRO is a Flask web application that generates G-code for OMIO CNC machines. Bui
 
 ```
 src/                    # G-code generation core
+├── constants.py        # Enums and type constants
+├── models.py           # Dataclasses for Points, Cuts, Parameters
 ├── gcode_generator.py  # Main orchestrator
 ├── pattern_expander.py # Pattern → coordinates
 ├── hexagon_generator.py # Hexagon geometry

@@ -42,7 +42,8 @@ GPRO uses Flask with the application factory pattern. The backend handles:
     ├── services/       # Business logic
     │   ├── project_service.py
     │   ├── settings_service.py
-    │   └── gcode_service.py
+    │   ├── gcode_service.py
+    │   └── preview_service.py
     └── utils/
         └── responses.py  # API response helpers
 ```

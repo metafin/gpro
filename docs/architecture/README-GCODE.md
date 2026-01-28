@@ -32,7 +32,10 @@ src/
     ├── subroutine_generator.py  # M98 subroutine files
     ├── lead_in.py            # Ramped lead-in geometry calculations
     ├── validators.py         # Coordinate validation
-    └── file_manager.py       # Output file handling
+    ├── file_manager.py       # Output file handling
+    ├── config_writer.py      # Debug config file generation
+    ├── svg_arc.py            # SVG arc parameter conversion
+    └── corner_detection.py   # Corner analysis for feed reduction
 ```
 
 ## Data Models (`src/models.py`)

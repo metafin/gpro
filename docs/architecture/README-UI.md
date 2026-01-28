@@ -21,7 +21,8 @@ GPRO uses a server-rendered frontend with Jinja2 templates and vanilla JavaScrip
 │   ├── partials/               # Reusable components
 │   │   ├── coord_input.html    # X/Y coordinate input
 │   │   ├── pattern_fields.html # Pattern type fields
-│   │   └── modal_footer.html   # Modal buttons
+│   │   ├── modal_footer.html   # Modal buttons
+│   │   └── lead_in_fields.html # Lead-in settings fields
 │   ├── project/
 │   │   ├── new.html            # New project form
 │   │   └── edit.html           # Project editor (main workspace)
