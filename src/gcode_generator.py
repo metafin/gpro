@@ -1068,6 +1068,104 @@ class WebGCodeGenerator:
         config = self._hexagon_to_path_config(hexagon, params)
         return self._generate_path_cut(config, params)
 
+    def _generate_line_first_pass_inline(
+        self,
+        path: List[Dict],
+        params: ToolParams,
+        pass_depth: float,
+        lead_in_point: Optional[Tuple[float, float]],
+        hold_time: float = 0
+    ) -> List[str]:
+        """
+        Generate inline G-code for the first pass of a line cut at reduced feed.
+
+        Used when first_pass_feed_factor < 1.0 with subroutines enabled.
+        Generates the first pass inline so feed reduction can be applied,
+        while remaining passes use the subroutine at full feed.
+
+        Args:
+            path: List of path points with 'x', 'y', 'line_type', and arc data
+            params: Tool parameters including feed rates
+            pass_depth: Depth for this pass
+            lead_in_point: Optional (x, y) lead-in point for ramped entry
+            hold_time: Dwell time in seconds at start (0 = no dwell)
+
+        Returns:
+            List of G-code lines for the first pass (no retract at end)
+        """
+        lines = []
+        profile_start_x = path[0].get('x', 0)
+        profile_start_y = path[0].get('y', 0)
+
+        # Apply first pass feed reduction
+        reduced_feed = self._get_adjusted_feed(params.feed_rate, pass_num=0)
+
+        # Add dwell if specified (before plunge)
+        if hold_time > 0:
+            hold_time_ms = int(hold_time * 1000)
+            lines.append(f"G04 P{hold_time_ms}")
+
+        # Entry: ramp or plunge to first pass depth
+        if lead_in_point is not None:
+            # Ramp from lead-in to profile start while descending
+            lines.append(
+                f"G01 X{format_coordinate(profile_start_x)} Y{format_coordinate(profile_start_y)} "
+                f"Z{format_coordinate(-pass_depth)} F{format_coordinate(params.plunge_rate, 1)}"
+            )
+        else:
+            # Vertical plunge
+            lines.append(generate_linear_move(z=-pass_depth, feed=params.plunge_rate))
+
+        # Track current position for arc calculations
+        current_x = profile_start_x
+        current_y = profile_start_y
+
+        # Process each point after the start
+        for point in path[1:]:
+            x = point.get('x', 0)
+            y = point.get('y', 0)
+            line_type = point.get('line_type', 'straight')
+
+            if line_type == 'arc':
+                arc_center_x = point.get('arc_center_x', x)
+                arc_center_y = point.get('arc_center_y', y)
+                arc_dir_hint = point.get('arc_direction')
+
+                i_offset = arc_center_x - current_x
+                j_offset = arc_center_y - current_y
+
+                direction = calculate_arc_direction(
+                    (current_x, current_y),
+                    (x, y),
+                    (arc_center_x, arc_center_y),
+                    arc_dir_hint
+                )
+
+                lines.append(
+                    f"{direction} X{format_coordinate(x)} Y{format_coordinate(y)} "
+                    f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} "
+                    f"F{format_coordinate(reduced_feed, 1)}"
+                )
+            else:
+                lines.append(
+                    f"G01 X{format_coordinate(x)} Y{format_coordinate(y)} "
+                    f"F{format_coordinate(reduced_feed, 1)}"
+                )
+
+            current_x = x
+            current_y = y
+
+        # For closed paths with lead-in, return to lead-in point
+        if lead_in_point is not None and is_closed_path(path):
+            lead_in_x, lead_in_y = lead_in_point
+            lines.append(
+                f"G01 X{format_coordinate(lead_in_x)} Y{format_coordinate(lead_in_y)} "
+                f"F{format_coordinate(reduced_feed, 1)}"
+            )
+
+        # Note: No retract - stay at depth for subroutine to continue
+        return lines
+
     def generate_line_gcode(
         self,
         line_cuts: List[Dict],
@@ -1134,13 +1232,17 @@ class WebGCodeGenerator:
                 )
 
             if self.settings.supports_subroutines:
+                # Check if first pass feed reduction is enabled
+                use_first_pass_reduction = self.settings.first_pass_feed_factor < 1.0
+
                 sub_num = get_next_subroutine_number('line', self.used_subroutine_numbers)
                 self.used_subroutine_numbers.append(sub_num)
 
+                # Subroutine always uses full feed (first pass handled inline if needed)
                 sub_content = generate_line_path_subroutine(
                     path, actual_pass_depth, params.plunge_rate, params.feed_rate,
                     lead_in_point=lead_in_point,
-                    hold_time=hold_time
+                    hold_time=hold_time if not use_first_pass_reduction else 0  # Dwell in inline first pass
                 )
                 self.subroutines[sub_num] = sub_content
 
@@ -1148,6 +1250,7 @@ class WebGCodeGenerator:
                     self.settings.gcode_base_path, self.project_name, sub_num
                 )
 
+                # Rapid to start position
                 if use_lead_in:
                     lines.append(generate_rapid_move(x=lead_in_point[0], y=lead_in_point[1], z=self.settings.travel_height))
                 else:
@@ -1156,7 +1259,19 @@ class WebGCodeGenerator:
                     lines.append(generate_rapid_move(x=start_x, y=start_y, z=self.settings.travel_height))
 
                 lines.append(generate_rapid_move(z=0))
-                lines.append(generate_subroutine_call(sub_path, num_passes))
+
+                if use_first_pass_reduction:
+                    # First pass inline at reduced feed, remaining passes via subroutine
+                    lines.extend(self._generate_line_first_pass_inline(
+                        path, params, actual_pass_depth, lead_in_point, hold_time
+                    ))
+                    # Call subroutine for remaining passes (if any)
+                    if num_passes > 1:
+                        lines.append(generate_subroutine_call(sub_path, num_passes - 1))
+                else:
+                    # All passes via subroutine at full feed
+                    lines.append(generate_subroutine_call(sub_path, num_passes))
+
                 lines.append(generate_rapid_move(z=self.settings.safety_height))
             else:
                 lines.extend(self._generate_line_inline(path, params, compensation, line_cut))
