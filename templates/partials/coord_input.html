@@ -1,0 +1,49 @@
+{#
+Coordinate Input Pair Partial
+Usage: {% include 'partials/coord_input.html' with context %}
+
+Expected context variables:
+- prefix: Field name prefix (e.g., "drill", "circle")
+- x_label: Label for X field (default: "X")
+- y_label: Label for Y field (default: "Y")
+- x_value: Initial X value (optional)
+- y_value: Initial Y value (optional)
+- step: Input step value (default: "0.001")
+- required: Whether fields are required (default: true)
+#}
+
+{% set x_label = x_label | default("X") %}
+{% set y_label = y_label | default("Y") %}
+{% set step = step | default("0.001") %}
+{% set required = required | default(true) %}
+
+<div class="coord-input-pair">
+    <div class="flex-fill">
+        <label class="form-label">{{ x_label }}</label>
+        <div class="input-group">
+            <input type="number"
+                   class="form-control"
+                   name="{{ prefix }}_x"
+                   id="{{ prefix }}_x"
+                   step="{{ step }}"
+                   {% if x_value is defined %}value="{{ x_value }}"{% endif %}
+                   {% if required %}required{% endif %}
+                   placeholder="0.000">
+            <span class="input-group-text">in</span>
+        </div>
+    </div>
+    <div class="flex-fill">
+        <label class="form-label">{{ y_label }}</label>
+        <div class="input-group">
+            <input type="number"
+                   class="form-control"
+                   name="{{ prefix }}_y"
+                   id="{{ prefix }}_y"
+                   step="{{ step }}"
+                   {% if y_value is defined %}value="{{ y_value }}"{% endif %}
+                   {% if required %}required{% endif %}
+                   placeholder="0.000">
+            <span class="input-group-text">in</span>
+        </div>
+    </div>
+</div>

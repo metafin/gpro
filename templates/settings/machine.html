@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Machine Settings - GPRO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-cpu"></i> Machine Settings</h1>
+</div>
+
+<form action="{{ url_for('settings.machine_save') }}" method="POST">
+    <div class="card">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Machine Name</label>
+                    <input type="text" class="form-control" name="name" value="{{ settings.name }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Controller Type</label>
+                    <select class="form-select" name="controller_type">
+                        <option value="mach3" {% if settings.controller_type == 'mach3' %}selected{% endif %}>Mach3</option>
+                        <option value="mach4" {% if settings.controller_type == 'mach4' %}selected{% endif %}>Mach4</option>
+                        <option value="grbl" {% if settings.controller_type == 'grbl' %}selected{% endif %}>GRBL</option>
+                        <option value="linuxcnc" {% if settings.controller_type == 'linuxcnc' %}selected{% endif %}>LinuxCNC</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="my-4">
+
+            <h5>Table Size</h5>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label">Max X Travel</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" name="max_x" step="0.1" value="{{ settings.max_x }}" required>
+                        <span class="input-group-text">in</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Max Y Travel</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" name="max_y" step="0.1" value="{{ settings.max_y }}" required>
+                        <span class="input-group-text">in</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Default Units</label>
+                    <select class="form-select" name="units">
+                        <option value="inches" {% if settings.units == 'inches' %}selected{% endif %}>Inches</option>
+                        <option value="mm" {% if settings.units == 'mm' %}selected{% endif %}>Millimeters</option>
+                    </select>
+                </div>
+            </div>
+
+            <h5>G-Code Output Path</h5>
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <label class="form-label">G-Code Base Path</label>
+                    <input type="text" class="form-control" name="gcode_base_path" value="{{ settings.gcode_base_path }}" placeholder="C:\Mach3\GCode">
+                    <div class="form-text">Absolute path where G-code project directories will be stored</div>
+                </div>
+            </div>
+
+            <h5>Controller Capabilities</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="supports_subroutines" id="supportsSubroutines" {% if settings.supports_subroutines %}checked{% endif %}>
+                        <label class="form-check-label" for="supportsSubroutines">
+                            Supports Subroutines (M98)
+                        </label>
+                        <div class="form-text">Enable for M98 subroutine calls to external files</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="supports_canned_cycles" id="supportsCannedCycles" {% if settings.supports_canned_cycles %}checked{% endif %}>
+                        <label class="form-check-label" for="supportsCannedCycles">
+                            Supports Canned Cycles (G83)
+                        </label>
+                        <div class="form-text">Enable for peck drilling cycles</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Save Settings
+            </button>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </div>
+</form>
+{% endblock %}

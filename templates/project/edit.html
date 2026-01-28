@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - GPRO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            <i class="bi bi-arrow-left"></i> Back to Projects
+        </a>
+        <h1 id="projectTitle">{{ project.name }}</h1>
+    </div>
+    <div class="btn-group">
+        <button type="button" class="btn btn-outline-primary" onclick="editor.refreshPreview()">
+            <i class="bi bi-arrow-clockwise"></i> Refresh Preview
+        </button>
+        <button type="button" class="btn btn-success" onclick="editor.download()">
+            <i class="bi bi-download"></i> Download G-Code
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column - Project Info & Operations -->
+    <div class="col-lg-6">
+        <!-- Project Info Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Project Info</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" id="projectName" value="{{ project.name }}" onchange="editor.updateField('name', this.value)">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" id="projectType" onchange="editor.changeType(this.value)">
+                            <option value="drill" {% if project.project_type == 'drill' %}selected{% endif %}>Drill</option>
+                            <option value="cut" {% if project.project_type == 'cut' %}selected{% endif %}>Cut</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Material</label>
+                        <select class="form-select" id="projectMaterial" onchange="editor.updateField('material_id', this.value)">
+                            <option value="">-- Select Material --</option>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Tool</label>
+                        <select class="form-select" id="projectTool" onchange="editor.updateTool(this.value)">
+                            <option value="">-- Select Tool --</option>
+                            <!-- Populated by JS based on project type -->
+                        </select>
+                    </div>
+                    <div class="col-12" id="tubeOptionsContainer" style="display: none;">
+                        <label class="form-label">Tube Options</label>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Working Length</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control" id="workingLength"
+                                           step="0.001" min="0.1" placeholder="12.0"
+                                           onchange="editor.updateField('working_length', parseFloat(this.value) || null)">
+                                    <span class="input-group-text">in</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Drilling Face</label>
+                                <select class="form-select form-select-sm" id="tubeOrientation"
+                                        onchange="editor.updateField('tube_orientation', this.value || null)">
+                                    <option value="wide">Wide face up</option>
+                                    <option value="narrow">Narrow face up</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Void Skip</label>
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="tubeVoidSkip"
+                                           onchange="editor.updateField('tube_void_skip', this.checked)">
+                                    <label class="form-check-label small" for="tubeVoidSkip">
+                                        Skip hollow center
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Operations Card -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Operations</h5>
+                <div id="operationButtons">
+                    <!-- Buttons populated by JS based on project type -->
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="operationsList" class="operations-list">
+                    <!-- Operations populated by JS -->
+                </div>
+                <div id="noOperations" class="empty-state py-4">
+                    <i class="bi bi-plus-circle"></i>
+                    <p>No operations yet. Add your first operation above.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column - Preview & Download -->
+    <div class="col-lg-6">
+        <!-- Preview Card -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-eye"></i> Preview</h5>
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Coordinate Labels Selector -->
+                    <div class="d-flex align-items-center gap-1">
+                        <label class="form-label small mb-0" for="coordsMode">Coords:</label>
+                        <select class="form-select form-select-sm" id="coordsMode" style="width: auto;" onchange="editor.setCoordsMode(this.value)">
+                            <option value="off">Off</option>
+                            <option value="feature">Feature</option>
+                            <option value="toolpath">Toolpath</option>
+                        </select>
+                    </div>
+                    <!-- Zoom Controls -->
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Zoom controls">
+                        <button type="button" class="btn btn-outline-secondary" onclick="editor.zoomOut()" title="Zoom out">
+                            <i class="bi bi-dash"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="zoomLevelBtn" onclick="editor.resetZoom()" title="Reset zoom" style="min-width: 50px;">
+                            100%
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="editor.zoomIn()" title="Zoom in">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="previewContainer" class="preview-container" onwheel="editor.handleZoomWheel(event)">
+                    <span class="text-muted">Click "Refresh Preview" to generate</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Card -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validation</h5>
+            </div>
+            <div class="card-body">
+                <div id="validationResults">
+                    <span class="text-muted">Validation results will appear here</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unsaved Changes Indicator -->
+<div id="unsavedIndicator" class="unsaved-indicator" style="display: none;">
+    <div class="card shadow">
+        <div class="card-body py-2 px-3">
+            <span class="text-warning me-2"><i class="bi bi-exclamation-circle"></i> Unsaved changes</span>
+            <button type="button" class="btn btn-sm btn-primary" onclick="editor.save()">Save</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="editor.discard()">Discard</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Drill Modal -->
+<div class="modal fade" id="addDrillModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form onsubmit="event.preventDefault(); editor.addDrillOperation();">
+                <div class="modal-header">
+                    <h5 class="modal-title" data-add-title="Add Drill Operation" data-edit-title="Edit Drill Operation">Add Drill Operation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% set prefix = "drill" %}
+                    {% set show_grid = true %}
+                    {% include 'partials/pattern_fields.html' %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" data-add-text="Add Drill" data-edit-text="Save Changes">Add Drill</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Circle Modal -->
+<div class="modal fade" id="addCircleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form onsubmit="event.preventDefault(); editor.addCircleOperation();">
+                <div class="modal-header">
+                    <h5 class="modal-title" data-add-title="Add Circle Cut" data-edit-title="Edit Circle Cut">Add Circle Cut</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% set prefix = "circle" %}
+                    {% set show_grid = false %}
+                    {% include 'partials/pattern_fields.html' %}
+
+                    <div class="mt-3">
+                        <label class="form-label">Diameter</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="circle_diameter" step="0.001" placeholder="0.500" required>
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Tool Compensation</label>
+                        <select class="form-select" id="circleCompensation">
+                            <option value="none" selected>None (tool center follows path)</option>
+                            <option value="interior">Interior (pocket cut)</option>
+                            <option value="exterior">Exterior (outside cut)</option>
+                        </select>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Hold Time (seconds)</label>
+                        <input type="number" class="form-control" id="circleHoldTime"
+                               min="0" step="1" value="0" placeholder="0">
+                        <div class="form-text">
+                            Pause at start of each pass for chip clearing and lubrication. 0 = no pause.
+                        </div>
+                    </div>
+
+                    {% set prefix = "circle" %}
+                    {% set supports_helical = true %}
+                    {% include 'partials/lead_in_fields.html' %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info" data-add-text="Add Circle" data-edit-text="Save Changes">Add Circle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Hex Modal -->
+<div class="modal fade" id="addHexModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form onsubmit="event.preventDefault(); editor.addHexOperation();">
+                <div class="modal-header">
+                    <h5 class="modal-title" data-add-title="Add Hexagon Cut" data-edit-title="Edit Hexagon Cut">Add Hexagon Cut</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    {% set prefix = "hex" %}
+                    {% set show_grid = false %}
+                    {% include 'partials/pattern_fields.html' %}
+
+                    <div class="mt-3">
+                        <label class="form-label">Flat-to-Flat (wrench size)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="hex_flat_to_flat" step="0.001" placeholder="0.500" required>
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Tool Compensation</label>
+                        <select class="form-select" id="hexCompensation">
+                            <option value="none" selected>None (tool center follows path)</option>
+                            <option value="interior">Interior (pocket cut)</option>
+                            <option value="exterior">Exterior (outside cut)</option>
+                        </select>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label">Hold Time (seconds)</label>
+                        <input type="number" class="form-control" id="hexHoldTime"
+                               min="0" step="1" value="0" placeholder="0">
+                        <div class="form-text">
+                            Pause at start of each pass for chip clearing and lubrication. 0 = no pause.
+                        </div>
+                    </div>
+
+                    {% set prefix = "hex" %}
+                    {% set supports_helical = true %}
+                    {% include 'partials/lead_in_fields.html' %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning" data-add-text="Add Hexagon" data-edit-text="Save Changes">Add Hexagon</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Line Modal -->
+<div class="modal fade" id="addLineModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form onsubmit="event.preventDefault(); editor.addLineOperation();">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Line Cut</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">Points</label>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editor.addLinePoint()">
+                                <i class="bi bi-plus"></i> Add Point
+                            </button>
+                        </div>
+                        <div id="linePointsList">
+                            <!-- Points added dynamically -->
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tool Compensation</label>
+                        <select class="form-select" id="lineCompensation">
+                            <option value="none" selected>None (tool center follows path)</option>
+                            <option value="interior">Interior (pocket/window cut)</option>
+                            <option value="exterior">Exterior (cutting out a shape)</option>
+                        </select>
+                        <div class="form-text">
+                            Interior: offset inward, material stays outside the path.
+                            Exterior: offset outward, material stays inside the path.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Hold Time (seconds)</label>
+                        <input type="number" class="form-control" id="lineHoldTime"
+                               min="0" step="1" value="0" placeholder="0">
+                        <div class="form-text">
+                            Pause at start of each pass for chip clearing and lubrication. 0 = no pause.
+                        </div>
+                    </div>
+
+                    {% set prefix = "line" %}
+                    {% set supports_helical = false %}
+                    {% include 'partials/lead_in_fields.html' %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Add Line Cut</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Data passed from server
+    const PROJECT_ID = "{{ project.id }}";
+    const PROJECT_DATA = {{ project_json | safe }};
+    const MATERIALS = {{ materials_json | safe }};
+    const TOOLS = {{ tools_json | safe }};
+    const MACHINE = {{ machine_json | safe }};
+</script>
+<script src="{{ url_for('static', filename='js/unsaved-changes.js') }}"></script>
+<script src="{{ url_for('static', filename='js/project-editor.js') }}"></script>
+{% endblock %}

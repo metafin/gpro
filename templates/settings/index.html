@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - GPRO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-gear"></i> Settings</h1>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-tools text-primary"></i> Tools</h5>
+                <p class="card-text">Manage drill bits and end mills available for projects.</p>
+                <a href="{{ url_for('settings.tools') }}" class="btn btn-outline-primary">Manage Tools</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-box text-primary"></i> Materials</h5>
+                <p class="card-text">Configure materials and their G-code machining parameters.</p>
+                <a href="{{ url_for('settings.materials') }}" class="btn btn-outline-primary">Manage Materials</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-cpu text-primary"></i> Machine</h5>
+                <p class="card-text">Configure CNC machine settings and capabilities.</p>
+                <a href="{{ url_for('settings.machine') }}" class="btn btn-outline-primary">Machine Settings</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-sliders text-primary"></i> General</h5>
+                <p class="card-text">Configure general G-code generation settings.</p>
+                <a href="{{ url_for('settings.general') }}" class="btn btn-outline-primary">General Settings</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

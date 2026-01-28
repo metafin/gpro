@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Tools - GPRO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-tools"></i> Tools</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addToolModal">
+        <i class="bi bi-plus-lg"></i> Add Tool
+    </button>
+</div>
+
+<!-- Drills -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bullseye"></i> Drill Bits</h5>
+    </div>
+    <div class="card-body">
+        {% if drills %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Size</th>
+                        <th>Description</th>
+                        <th>Tip Compensation</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tool in drills %}
+                    <tr>
+                        <td>{{ tool.size }}"{% if tool.size_unit == 'mm' %} (mm){% endif %}</td>
+                        <td>{{ tool.description or '-' }}</td>
+                        <td>{{ tool.tip_compensation or 0 }}"</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editToolModal{{ tool.id }}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form action="{{ url_for('settings.delete_tool', tool_id=tool.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this tool?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No drill bits configured.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Edit Tool Modals for Drills -->
+{% for tool in drills %}
+<div class="modal fade" id="editToolModal{{ tool.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('settings.update_tool', tool_id=tool.id) }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Drill - {{ tool.description or tool.size ~ '"' }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" value="{{ tool.description or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tip Compensation (inches)</label>
+                        <input type="number" class="form-control" name="tip_compensation" step="0.001" value="{{ tool.tip_compensation or 0 }}" placeholder="0.04">
+                        <div class="form-text">Extra depth to account for drill point geometry. Typical values: 0.03-0.05" for 118° points.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Single Flute End Mills -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-hurricane"></i> Single Flute End Mills</h5>
+    </div>
+    <div class="card-body">
+        {% if end_mills_1flute %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Size</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tool in end_mills_1flute %}
+                    <tr>
+                        <td>{{ tool.size }}"{% if tool.size_unit == 'mm' %} (mm){% endif %}</td>
+                        <td>{{ tool.description or '-' }}</td>
+                        <td class="text-end">
+                            <form action="{{ url_for('settings.delete_tool', tool_id=tool.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this tool?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No single flute end mills configured.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Double Flute End Mills -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-fan"></i> Double Flute End Mills</h5>
+    </div>
+    <div class="card-body">
+        {% if end_mills_2flute %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Size</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tool in end_mills_2flute %}
+                    <tr>
+                        <td>{{ tool.size }}"{% if tool.size_unit == 'mm' %} (mm){% endif %}</td>
+                        <td>{{ tool.description or '-' }}</td>
+                        <td class="text-end">
+                            <form action="{{ url_for('settings.delete_tool', tool_id=tool.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this tool?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No double flute end mills configured.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Tool Modal -->
+<div class="modal fade" id="addToolModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('settings.create_tool') }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Tool</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tool Type</label>
+                        <select class="form-select" name="tool_type" id="addToolType" required onchange="toggleTipCompensation()">
+                            <option value="drill">Drill Bit</option>
+                            <option value="end_mill_1flute">Single Flute End Mill</option>
+                            <option value="end_mill_2flute">Double Flute End Mill</option>
+                        </select>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-8">
+                            <label class="form-label">Size (Diameter)</label>
+                            <input type="number" class="form-control" name="size" step="0.001" required placeholder="0.125">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Unit</label>
+                            <select class="form-select" name="size_unit">
+                                <option value="in">Inches</option>
+                                <option value="mm">mm</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" name="description" placeholder='e.g., 1/8" cobalt drill bit'>
+                    </div>
+                    <div class="mb-3" id="tipCompensationField">
+                        <label class="form-label">Tip Compensation (inches)</label>
+                        <input type="number" class="form-control" name="tip_compensation" step="0.001" value="0.04" placeholder="0.04">
+                        <div class="form-text">Extra depth to account for drill point geometry. Typical values: 0.03-0.05" for 118° points.</div>
+                    </div>
+                </div>
+                {% set confirm_text = "Add Tool" %}
+                {% include 'partials/modal_footer.html' %}
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTipCompensation() {
+    const toolType = document.getElementById('addToolType').value;
+    const tipField = document.getElementById('tipCompensationField');
+    tipField.style.display = toolType === 'drill' ? 'block' : 'none';
+}
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', toggleTipCompensation);
+</script>
+{% endblock %}

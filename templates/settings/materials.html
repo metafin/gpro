@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Materials - GPRO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-box"></i> Materials</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMaterialModal">
+        <i class="bi bi-plus-lg"></i> Add Material
+    </button>
+</div>
+
+{% if materials %}
+<div class="row g-4">
+    {% for material in materials %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ material.display_name }}</h5>
+                <p class="card-text text-muted">
+                    <span class="badge bg-secondary">{{ material.base_material | capitalize }}</span>
+                    <span class="badge bg-info">{{ material.form | capitalize }}</span>
+                </p>
+                <p class="card-text small">
+                    {% if material.form == 'sheet' %}
+                    Thickness: {{ material.thickness }}"
+                    {% else %}
+                    {{ material.outer_width }}" x {{ material.outer_height }}" ({{ material.wall_thickness }}" wall)
+                    {% endif %}
+                </p>
+            </div>
+            <div class="card-footer bg-transparent">
+                <a href="{{ url_for('settings.edit_material', material_id=material.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+                <form action="{{ url_for('settings.delete_material', material_id=material.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this material?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <i class="bi bi-box"></i>
+    <p>No materials configured yet.</p>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMaterialModal">
+        Add Your First Material
+    </button>
+</div>
+{% endif %}
+
+<!-- Add Material Modal -->
+<div class="modal fade" id="addMaterialModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('settings.create_material') }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Material</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Display Name</label>
+                        <input type="text" class="form-control" name="display_name" required placeholder='e.g., Aluminum Sheet 1/8"'>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">ID (no spaces)</label>
+                        <input type="text" class="form-control" name="id" required pattern="[a-z0-9_]+" placeholder="e.g., aluminum_sheet_0125">
+                        <div class="form-text">Lowercase letters, numbers, and underscores only.</div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Base Material</label>
+                            <select class="form-select" name="base_material" required>
+                                <option value="aluminum">Aluminum</option>
+                                <option value="polycarbonate">Polycarbonate</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Form</label>
+                            <select class="form-select" name="form" id="materialForm" required onchange="toggleFormFields()">
+                                <option value="sheet">Sheet</option>
+                                <option value="tube">Tube</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Sheet Fields -->
+                    <div id="sheetFields">
+                        <div class="mb-3">
+                            <label class="form-label">Thickness</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="thickness" step="0.001" placeholder="0.125">
+                                <span class="input-group-text">in</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tube Fields -->
+                    <div id="tubeFields" style="display: none;">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Outer Width</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" name="outer_width" step="0.001" placeholder="2.0">
+                                    <span class="input-group-text">in</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Outer Height</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" name="outer_height" step="0.001" placeholder="1.0">
+                                    <span class="input-group-text">in</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Wall Thickness</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="wall_thickness" step="0.001" placeholder="0.125">
+                                <span class="input-group-text">in</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% set confirm_text = "Add Material" %}
+                {% include 'partials/modal_footer.html' %}
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleFormFields() {
+    const form = document.getElementById('materialForm').value;
+    document.getElementById('sheetFields').style.display = form === 'sheet' ? 'block' : 'none';
+    document.getElementById('tubeFields').style.display = form === 'tube' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

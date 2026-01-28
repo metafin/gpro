@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ material.display_name }} - GPRO{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="{{ url_for('settings.materials') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            <i class="bi bi-arrow-left"></i> Back to Materials
+        </a>
+        <h1>{{ material.display_name }}</h1>
+    </div>
+</div>
+
+<form action="{{ url_for('settings.update_material', material_id=material.id) }}" method="POST">
+    <!-- Basic Info Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Basic Information</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Display Name</label>
+                    <input type="text" class="form-control" name="display_name" value="{{ material.display_name }}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Base Material</label>
+                    <select class="form-select" name="base_material" required>
+                        <option value="aluminum" {% if material.base_material == 'aluminum' %}selected{% endif %}>Aluminum</option>
+                        <option value="polycarbonate" {% if material.base_material == 'polycarbonate' %}selected{% endif %}>Polycarbonate</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Form</label>
+                    <select class="form-select" name="form" id="materialForm" required onchange="toggleFormFields()">
+                        <option value="sheet" {% if material.form == 'sheet' %}selected{% endif %}>Sheet</option>
+                        <option value="tube" {% if material.form == 'tube' %}selected{% endif %}>Tube</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Sheet Fields -->
+            <div id="sheetFields" class="mt-3" {% if material.form != 'sheet' %}style="display: none;"{% endif %}>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Thickness</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="thickness" step="0.001" value="{{ material.thickness or '' }}">
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tube Fields -->
+            <div id="tubeFields" class="mt-3" {% if material.form != 'tube' %}style="display: none;"{% endif %}>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Outer Width</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="outer_width" step="0.001" value="{{ material.outer_width or '' }}">
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Outer Height</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="outer_height" step="0.001" value="{{ material.outer_height or '' }}">
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Wall Thickness</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="wall_thickness" step="0.001" value="{{ material.wall_thickness or '' }}">
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- G-Code Standards Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">G-Code Standards</h5>
+            <small class="text-muted">Configure machining parameters for each tool size</small>
+        </div>
+        <div class="card-body">
+            <ul class="nav nav-tabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#drillTab" type="button">Drill Bits</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#endmill1Tab" type="button">Single Flute End Mills</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#endmill2Tab" type="button">Double Flute End Mills</button>
+                </li>
+            </ul>
+
+            <div class="tab-content pt-3">
+                <!-- Drill Tab -->
+                <div class="tab-pane fade show active" id="drillTab">
+                    {% if drills %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Size</th>
+                                    <th>Spindle Speed (RPM)</th>
+                                    <th>Feed Rate (in/min)</th>
+                                    <th>Plunge Rate (in/min)</th>
+                                    <th>Pecking Depth (in)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tool in drills %}
+                                {% set size_key = tool.size | string %}
+                                {% set params = material.gcode_standards.get('drill', {}).get(size_key, {}) %}
+                                <tr>
+                                    <td>{{ tool.size }}"</td>
+                                    <td><input type="number" class="form-control form-control-sm" name="drill_{{ size_key }}_spindle_speed" value="{{ params.get('spindle_speed', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="drill_{{ size_key }}_feed_rate" step="0.1" value="{{ params.get('feed_rate', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="drill_{{ size_key }}_plunge_rate" step="0.1" value="{{ params.get('plunge_rate', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="drill_{{ size_key }}_pecking_depth" step="0.01" value="{{ params.get('pecking_depth', '') }}"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No drill bits configured. <a href="{{ url_for('settings.tools') }}">Add tools first.</a></p>
+                    {% endif %}
+                </div>
+
+                <!-- Single Flute End Mill Tab -->
+                <div class="tab-pane fade" id="endmill1Tab">
+                    {% if end_mills_1flute %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Size</th>
+                                    <th>Spindle Speed (RPM)</th>
+                                    <th>Feed Rate (in/min)</th>
+                                    <th>Plunge Rate (in/min)</th>
+                                    <th>Pass Depth (in)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tool in end_mills_1flute %}
+                                {% set size_key = tool.size | string %}
+                                {% set params = material.gcode_standards.get('end_mill_1flute', {}).get(size_key, {}) %}
+                                <tr>
+                                    <td>{{ tool.size }}"</td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_spindle_speed" value="{{ params.get('spindle_speed', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_feed_rate" step="0.1" value="{{ params.get('feed_rate', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_plunge_rate" step="0.1" value="{{ params.get('plunge_rate', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_pass_depth" step="0.001" value="{{ params.get('pass_depth', '') }}"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No single flute end mills configured. <a href="{{ url_for('settings.tools') }}">Add tools first.</a></p>
+                    {% endif %}
+                </div>
+
+                <!-- Double Flute End Mill Tab -->
+                <div class="tab-pane fade" id="endmill2Tab">
+                    {% if end_mills_2flute %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Size</th>
+                                    <th>Spindle Speed (RPM)</th>
+                                    <th>Feed Rate (in/min)</th>
+                                    <th>Plunge Rate (in/min)</th>
+                                    <th>Pass Depth (in)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tool in end_mills_2flute %}
+                                {% set size_key = tool.size | string %}
+                                {% set params = material.gcode_standards.get('end_mill_2flute', {}).get(size_key, {}) %}
+                                <tr>
+                                    <td>{{ tool.size }}"</td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_spindle_speed" value="{{ params.get('spindle_speed', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_feed_rate" step="0.1" value="{{ params.get('feed_rate', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_plunge_rate" step="0.1" value="{{ params.get('plunge_rate', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_pass_depth" step="0.001" value="{{ params.get('pass_depth', '') }}"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No double flute end mills configured. <a href="{{ url_for('settings.tools') }}">Add tools first.</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save Changes
+        </button>
+        <a href="{{ url_for('settings.materials') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+function toggleFormFields() {
+    const form = document.getElementById('materialForm').value;
+    document.getElementById('sheetFields').style.display = form === 'sheet' ? 'block' : 'none';
+    document.getElementById('tubeFields').style.display = form === 'tube' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -28,6 +28,10 @@ Thumbs.db
 # Project specific
 output/
 *.gcode
+*.nc
+
+# Mach3 G-code output directories
+C:\\Mach3\\GCode\\FPRO/
 
 # Environment variables
 .env

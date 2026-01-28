@@ -1,0 +1,289 @@
+/* GPRO Custom Styles */
+
+/* Brand font for logo */
+@font-face {
+    font-family: 'GPRO-Brand';
+    src: url('../fonts/gpro-brand.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+/* Color palette overrides */
+:root {
+    --bs-primary: #2F055A;
+    --bs-primary-rgb: 47, 5, 90;
+    --bs-info: #5a7a8a;
+    --bs-info-rgb: 90, 122, 138;
+    --bs-success: #5a8a6e;
+    --bs-success-rgb: 90, 138, 110;
+    --bs-warning: #c9a87c;
+    --bs-warning-rgb: 201, 168, 124;
+    --bs-danger: #a85a6e;
+    --bs-danger-rgb: 168, 90, 110;
+}
+
+/* Base font */
+body {
+    font-family: 'Avenir', 'Avenir Next', 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Brand logo styling */
+.brand-logo {
+    font-family: 'GPRO-Brand', 'Avenir', 'Nunito', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+/* Primary button styling */
+.btn-primary {
+    --bs-btn-bg: #2F055A;
+    --bs-btn-border-color: #2F055A;
+    --bs-btn-hover-bg: #240445;
+    --bs-btn-hover-border-color: #240445;
+    --bs-btn-active-bg: #1a0333;
+    --bs-btn-active-border-color: #1a0333;
+    --bs-btn-disabled-bg: #2F055A;
+    --bs-btn-disabled-border-color: #2F055A;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: #2F055A;
+    --bs-btn-border-color: #2F055A;
+    --bs-btn-hover-bg: #2F055A;
+    --bs-btn-hover-border-color: #2F055A;
+    --bs-btn-active-bg: #240445;
+    --bs-btn-active-border-color: #240445;
+}
+
+/* Info button (teal) */
+.btn-info {
+    --bs-btn-bg: #5a7a8a;
+    --bs-btn-border-color: #5a7a8a;
+    --bs-btn-hover-bg: #4a6a7a;
+    --bs-btn-hover-border-color: #4a6a7a;
+    --bs-btn-color: #fff;
+    --bs-btn-hover-color: #fff;
+}
+
+/* Success button (green) */
+.btn-success {
+    --bs-btn-bg: #5a8a6e;
+    --bs-btn-border-color: #5a8a6e;
+    --bs-btn-hover-bg: #4a7a5e;
+    --bs-btn-hover-border-color: #4a7a5e;
+}
+
+/* Warning button (amber) */
+.btn-warning {
+    --bs-btn-bg: #c9a87c;
+    --bs-btn-border-color: #c9a87c;
+    --bs-btn-hover-bg: #b9986c;
+    --bs-btn-hover-border-color: #b9986c;
+    --bs-btn-color: #000;
+}
+
+/* Danger button (pink) */
+.btn-danger {
+    --bs-btn-bg: #a85a6e;
+    --bs-btn-border-color: #a85a6e;
+    --bs-btn-hover-bg: #984a5e;
+    --bs-btn-hover-border-color: #984a5e;
+}
+
+/* Navbar styling */
+.navbar {
+    background-color: #2F055A !important;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+.navbar-brand {
+    font-size: 3rem;
+    line-height: 1;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Badge styling for operation types */
+.badge.bg-primary {
+    background-color: #2F055A !important;
+}
+
+.badge.bg-info {
+    background-color: #5a7a8a !important;
+    color: #fff !important;
+}
+
+.badge.bg-success {
+    background-color: #5a8a6e !important;
+}
+
+.badge.bg-warning {
+    background-color: #c9a87c !important;
+    color: #000 !important;
+}
+
+.badge.bg-danger {
+    background-color: #a85a6e !important;
+}
+
+/* Card styling */
+.card {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    background-color: rgba(47, 5, 90, 0.05);
+    border-bottom: 1px solid rgba(47, 5, 90, 0.1);
+}
+
+/* Project card styling */
+.project-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.project-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+/* Form styling */
+.form-label {
+    font-weight: 600;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #2F055A;
+    box-shadow: 0 0 0 0.25rem rgba(47, 5, 90, 0.25);
+}
+
+/* Link styling */
+a {
+    color: #2F055A;
+}
+
+a:hover {
+    color: #240445;
+}
+
+/* Table styling */
+.table {
+    --bs-table-hover-bg: rgba(47, 5, 90, 0.05);
+}
+
+/* Modal styling */
+.modal-header {
+    background-color: rgba(47, 5, 90, 0.05);
+    border-bottom: 1px solid rgba(47, 5, 90, 0.1);
+}
+
+/* Preview container */
+.preview-container {
+    min-height: 300px;
+    min-width: 300px;
+    height: 500px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    overflow: auto;
+    padding: 10px;
+    resize: both;
+}
+
+.preview-container .svg-zoom-wrapper {
+    display: inline-block;
+    transition: width 0.15s ease-out, height 0.15s ease-out;
+}
+
+.preview-container svg {
+    display: block;
+    transform-origin: top left;
+    transition: transform 0.15s ease-out;
+}
+
+/* Operations list */
+.operations-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.operation-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.operation-item:last-child {
+    border-bottom: none;
+}
+
+.operation-summary {
+    flex: 1;
+    margin-left: 0.5rem;
+}
+
+/* Unsaved changes indicator */
+.unsaved-indicator {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 1050;
+}
+
+/* Settings tabs */
+.nav-tabs .nav-link {
+    color: #2F055A;
+}
+
+.nav-tabs .nav-link.active {
+    color: #2F055A;
+    font-weight: 600;
+    border-bottom-color: #2F055A;
+}
+
+/* Coordinate input pairs */
+.coord-input-pair {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.coord-input-pair .form-control {
+    flex: 1;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+    padding: 1rem 0;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Utility classes */
+.text-primary {
+    color: #2F055A !important;
+}
+
+.bg-primary {
+    background-color: #2F055A !important;
+}
+
+.border-primary {
+    border-color: #2F055A !important;
+}

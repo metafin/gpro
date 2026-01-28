@@ -1,0 +1,53 @@
+{#
+Lead-In Fields Partial
+Usage: {% include 'partials/lead_in_fields.html' with context %}
+
+Expected context variables:
+- prefix: Field name prefix (e.g., "circle", "hex", "line")
+- supports_helical: Whether helical lead-in is supported (default: true, false for lines)
+#}
+
+{% set supports_helical = supports_helical | default(true) %}
+
+<div class="mt-3">
+    <label class="form-label">Lead-In Settings</label>
+    <select class="form-select" id="{{ prefix }}LeadInMode" onchange="toggleLeadInFields('{{ prefix }}')">
+        <option value="auto">Auto (use global settings)</option>
+        <option value="manual">Manual (override for this operation)</option>
+    </select>
+</div>
+
+<div id="{{ prefix }}_lead_in_manual_fields" style="display: none;">
+    <div class="row g-3 mt-1">
+        <div class="col-6">
+            <label class="form-label small">Lead-In Type</label>
+            <select class="form-select form-select-sm" id="{{ prefix }}LeadInType">
+                {% if supports_helical %}
+                <option value="helical">Helical (spiral entry)</option>
+                {% endif %}
+                <option value="ramp">Ramp (linear entry)</option>
+                <option value="none">None (vertical plunge)</option>
+            </select>
+        </div>
+        <div class="col-6">
+            <label class="form-label small">Approach Angle</label>
+            <div class="input-group input-group-sm">
+                <input type="number" class="form-control" id="{{ prefix }}LeadInApproachAngle"
+                       min="0" max="360" step="1" value="90" placeholder="90">
+                <span class="input-group-text">&deg;</span>
+            </div>
+            <div class="form-text small">0&deg;=top, 90&deg;=right, 180&deg;=bottom, 270&deg;=left</div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleLeadInFields(prefix) {
+    const modeSelect = document.getElementById(prefix + 'LeadInMode');
+    const manualFields = document.getElementById(prefix + '_lead_in_manual_fields');
+
+    if (modeSelect && manualFields) {
+        manualFields.style.display = modeSelect.value === 'manual' ? 'block' : 'none';
+    }
+}
+</script>

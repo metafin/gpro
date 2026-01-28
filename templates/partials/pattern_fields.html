@@ -1,0 +1,185 @@
+{#
+Pattern Fields Partial
+Usage: {% include 'partials/pattern_fields.html' with context %}
+
+Expected context variables:
+- prefix: Field name prefix (e.g., "drill", "circle")
+- show_grid: Whether to show grid pattern option (default: false, only for drills)
+#}
+
+{% set show_grid = show_grid | default(false) %}
+
+<div class="mb-3">
+    <label class="form-label">Pattern Type</label>
+    <select class="form-select" name="{{ prefix }}_pattern_type" id="{{ prefix }}_pattern_type" onchange="togglePatternFields('{{ prefix }}')">
+        <option value="single">Single Point</option>
+        <option value="linear">Linear Pattern</option>
+        {% if show_grid %}
+        <option value="grid">Grid Pattern</option>
+        {% endif %}
+    </select>
+</div>
+
+<!-- Single Point Fields -->
+<div id="{{ prefix }}_single_fields">
+    <div class="row g-3">
+        <div class="col-6">
+            <label class="form-label">X</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_x" step="0.001" placeholder="0.000">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+        <div class="col-6">
+            <label class="form-label">Y</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_y" step="0.001" placeholder="0.000">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Linear Pattern Fields -->
+<div id="{{ prefix }}_linear_fields" style="display: none;">
+    <div class="row g-3 mb-3">
+        <div class="col-6">
+            <label class="form-label">Start X</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_start_x" step="0.001" placeholder="0.000">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+        <div class="col-6">
+            <label class="form-label">Start Y</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_start_y" step="0.001" placeholder="0.000">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-4">
+            <label class="form-label">Axis</label>
+            <select class="form-select" name="{{ prefix }}_axis">
+                <option value="x">Along X</option>
+                <option value="y">Along Y</option>
+            </select>
+        </div>
+        <div class="col-4">
+            <label class="form-label">Spacing</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_spacing" step="0.001" placeholder="0.500">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+        <div class="col-4">
+            <label class="form-label">Count</label>
+            <input type="number" class="form-control" name="{{ prefix }}_count" min="1" value="1">
+        </div>
+    </div>
+</div>
+
+{% if show_grid %}
+<!-- Grid Pattern Fields (Drills only) -->
+<div id="{{ prefix }}_grid_fields" style="display: none;">
+    <div class="row g-3 mb-3">
+        <div class="col-6">
+            <label class="form-label">Start X</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_grid_start_x" step="0.001" placeholder="0.000">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+        <div class="col-6">
+            <label class="form-label">Start Y</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_grid_start_y" step="0.001" placeholder="0.000">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3 mb-3">
+        <div class="col-6">
+            <label class="form-label">X Spacing</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_x_spacing" step="0.001" placeholder="0.500">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+        <div class="col-6">
+            <label class="form-label">Y Spacing</label>
+            <div class="input-group">
+                <input type="number" class="form-control" name="{{ prefix }}_y_spacing" step="0.001" placeholder="0.500">
+                <span class="input-group-text">in</span>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-6">
+            <label class="form-label">X Count</label>
+            <input type="number" class="form-control" name="{{ prefix }}_x_count" min="1" value="1">
+        </div>
+        <div class="col-6">
+            <label class="form-label">Y Count</label>
+            <input type="number" class="form-control" name="{{ prefix }}_y_count" min="1" value="1">
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function togglePatternFields(prefix) {
+    const select = document.getElementById(prefix + '_pattern_type');
+    const newPatternType = select.value;
+    const prevPatternType = select.dataset.prevPattern || 'single';
+
+    // Get field references
+    const singleX = document.querySelector(`[name="${prefix}_x"]`);
+    const singleY = document.querySelector(`[name="${prefix}_y"]`);
+    const linearX = document.querySelector(`[name="${prefix}_start_x"]`);
+    const linearY = document.querySelector(`[name="${prefix}_start_y"]`);
+    const gridX = document.querySelector(`[name="${prefix}_grid_start_x"]`);
+    const gridY = document.querySelector(`[name="${prefix}_grid_start_y"]`);
+
+    // Capture X/Y from previous pattern type's fields
+    let prevX = '', prevY = '';
+    if (prevPatternType === 'single') {
+        prevX = singleX?.value || '';
+        prevY = singleY?.value || '';
+    } else if (prevPatternType === 'linear') {
+        prevX = linearX?.value || '';
+        prevY = linearY?.value || '';
+    } else if (prevPatternType === 'grid') {
+        prevX = gridX?.value || '';
+        prevY = gridY?.value || '';
+    }
+
+    // Store current pattern as previous for next switch
+    select.dataset.prevPattern = newPatternType;
+
+    // Hide all field groups
+    document.getElementById(prefix + '_single_fields').style.display = 'none';
+    document.getElementById(prefix + '_linear_fields').style.display = 'none';
+
+    const gridFields = document.getElementById(prefix + '_grid_fields');
+    if (gridFields) {
+        gridFields.style.display = 'none';
+    }
+
+    // Show selected field group and copy X/Y if destination is empty
+    if (newPatternType === 'single') {
+        document.getElementById(prefix + '_single_fields').style.display = 'block';
+        if (prevX && !singleX.value) singleX.value = prevX;
+        if (prevY && !singleY.value) singleY.value = prevY;
+    } else if (newPatternType === 'linear') {
+        document.getElementById(prefix + '_linear_fields').style.display = 'block';
+        if (prevX && !linearX.value) linearX.value = prevX;
+        if (prevY && !linearY.value) linearY.value = prevY;
+    } else if (newPatternType === 'grid' && gridFields) {
+        gridFields.style.display = 'block';
+        if (prevX && !gridX?.value) gridX.value = prevX;
+        if (prevY && !gridY?.value) gridY.value = prevY;
+    }
+}
+</script>
