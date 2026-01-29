@@ -7,7 +7,8 @@ from .gcode_format import (
     generate_rapid_move,
     generate_linear_move,
     generate_arc_move,
-    generate_subroutine_end
+    generate_subroutine_end,
+    calculate_ramped_helix_feed
 )
 from .lead_in import calculate_helix_revolutions, _user_angle_to_math_angle
 
@@ -177,13 +178,18 @@ def generate_helical_preamble_circle(
     the circle profile. Uses relative Z for multi-pass with L parameter.
     Each subroutine call descends from current Z position.
 
+    Feed rate ramping: The feed rate ramps up during the helix in 3 steps
+    (25%, 50%, 75% of the range from plunge_rate to feed_rate). The
+    transition arc completes at 100%. This provides smooth acceleration
+    as the tool establishes itself in the material.
+
     Args:
         helix_radius: Radius of the helical descent
         cut_radius: Radius of the circle toolpath
         pass_depth: Depth increment per pass
         helix_pitch: Z drop per revolution
-        plunge_rate: Feed rate for the helical descent
-        feed_rate: Feed rate for transition to profile
+        plunge_rate: Starting feed rate for the helical descent
+        feed_rate: Target feed rate (for transition to profile)
         approach_angle: Direction tool approaches from in degrees (0=top, 90=right)
                        Default 90° matches original 3 o'clock position
 
@@ -206,13 +212,14 @@ def generate_helical_preamble_circle(
     # Switch to relative mode for Z
     lines.append("G91")
 
-    # Helical descent - full circles with Z movement
-    # Position returns to start after each full circle
-    for _ in range(revolutions):
+    # Helical descent with feed ramping (25%, 50%, 75% steps)
+    # Transition arc (if any) completes at 100%
+    for rev in range(revolutions):
+        current_feed = calculate_ramped_helix_feed(rev, revolutions, plunge_rate, feed_rate)
         # G02 X0 Y0 means return to same XY (full circle), Z descends relatively
         lines.append(
             f"G02 X0 Y0 Z{format_coordinate(-depth_per_rev)} "
-            f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(plunge_rate, 1)}"
+            f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(current_feed, 1)}"
         )
 
     # Switch back to absolute mode
@@ -256,6 +263,10 @@ def generate_helical_preamble_hexagon(
     to the first vertex to begin cutting. Each subroutine call descends
     from current Z position for multi-pass with L parameter.
 
+    Feed rate ramping: The feed rate ramps up during the helix in 3 steps
+    (25%, 50%, 75% of the range from plunge_rate to feed_rate). The
+    transition to the first vertex completes at 100%.
+
     Args:
         center_x: Hexagon center X coordinate
         center_y: Hexagon center Y coordinate
@@ -264,8 +275,8 @@ def generate_helical_preamble_hexagon(
         first_vertex_y: Y coordinate of first hexagon vertex
         pass_depth: Depth increment per pass
         helix_pitch: Z drop per revolution
-        plunge_rate: Feed rate for the helical descent
-        feed_rate: Feed rate for transition to vertex
+        plunge_rate: Starting feed rate for the helical descent
+        feed_rate: Target feed rate (for transition to vertex)
         approach_angle: Direction tool approaches from in degrees (0=top, 90=right)
                        Default 90° matches original 3 o'clock position
 
@@ -288,17 +299,19 @@ def generate_helical_preamble_hexagon(
     # Switch to relative mode for Z
     lines.append("G91")
 
-    # Helical descent
-    for _ in range(revolutions):
+    # Helical descent with feed ramping (25%, 50%, 75% steps)
+    # Transition to vertex completes at 100%
+    for rev in range(revolutions):
+        current_feed = calculate_ramped_helix_feed(rev, revolutions, plunge_rate, feed_rate)
         lines.append(
             f"G02 X0 Y0 Z{format_coordinate(-depth_per_rev)} "
-            f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(plunge_rate, 1)}"
+            f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(current_feed, 1)}"
         )
 
     # Switch back to absolute mode
     lines.append("G90")
 
-    # Linear move from helix end to first vertex
+    # Linear move from helix end to first vertex at full feed
     lines.append(
         f"G01 X{format_coordinate(first_vertex_x)} Y{format_coordinate(first_vertex_y)} "
         f"F{format_coordinate(feed_rate, 1)}"

@@ -209,3 +209,47 @@ def sanitize_project_name(name: str) -> str:
 
     # Truncate to 50 characters
     return sanitized[:50]
+
+
+def calculate_ramped_helix_feed(
+    rev: int,
+    total_revolutions: int,
+    plunge_rate: float,
+    feed_rate: float
+) -> float:
+    """
+    Calculate the feed rate for a helix revolution with 4-step ramping.
+
+    Provides smooth acceleration as the tool establishes itself in material.
+    Helix revolutions get steps 1-3 (25%, 50%, 75% of the range).
+    The transition arc (handled separately) completes at 100%.
+
+    Step distribution:
+    - 1 revolution:  75%
+    - 2 revolutions: 50%, 75%
+    - 3+ revolutions: 25%, 50%, 75% (extra revs stay at 75%)
+
+    Args:
+        rev: Zero-indexed revolution number
+        total_revolutions: Total number of helix revolutions
+        plunge_rate: Starting feed rate
+        feed_rate: Target feed rate (100%)
+
+    Returns:
+        Feed rate for this revolution
+    """
+    step_percentages = [0.25, 0.50, 0.75]
+    feed_range = feed_rate - plunge_rate
+
+    if total_revolutions == 1:
+        # Single revolution: use 75% (just before transition)
+        step_pct = 0.75
+    elif total_revolutions == 2:
+        # Two revolutions: use 50% and 75%
+        step_pct = step_percentages[rev + 1]
+    else:
+        # 3+ revolutions: map to steps, later revolutions stay at 75%
+        step_index = min(rev, 2)
+        step_pct = step_percentages[step_index]
+
+    return plunge_rate + feed_range * step_pct

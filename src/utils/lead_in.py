@@ -17,7 +17,13 @@ Approach angle convention:
 import math
 from typing import Tuple, List, Optional
 
-from .gcode_format import format_coordinate, generate_rapid_move, generate_linear_move, generate_arc_move
+from .gcode_format import (
+    format_coordinate,
+    generate_rapid_move,
+    generate_linear_move,
+    generate_arc_move,
+    calculate_ramped_helix_feed
+)
 
 
 def _user_angle_to_math_angle(user_angle: float) -> float:
@@ -624,27 +630,12 @@ def generate_helical_lead_in(
     current_depth = 0
     depth_per_rev = target_depth / revolutions
 
-    # Feed step percentages for helix revolutions (transition arc is 100%)
-    step_percentages = [0.25, 0.50, 0.75]
-
     for rev in range(revolutions):
         current_depth += depth_per_rev
 
         # Calculate stepped feed rate for this revolution
         if end_feed is not None:
-            feed_range = end_feed - plunge_rate
-            # Distribute revolutions across the 3 helix steps
-            if revolutions == 1:
-                # Single revolution: use 75% (step 3, just before transition)
-                step_pct = 0.75
-            elif revolutions == 2:
-                # Two revolutions: use 50% and 75%
-                step_pct = step_percentages[rev + 1]
-            else:
-                # 3+ revolutions: map to steps, later revolutions stay at 75%
-                step_index = min(rev, 2)
-                step_pct = step_percentages[step_index]
-            current_feed = plunge_rate + feed_range * step_pct
+            current_feed = calculate_ramped_helix_feed(rev, revolutions, plunge_rate, end_feed)
         else:
             current_feed = plunge_rate
 
