@@ -572,238 +572,142 @@ def calculate_helix_revolutions(
     return max(1, revolutions)
 
 
-def generate_helical_lead_in(
-    center_x: float,
-    center_y: float,
+def generate_helical_entry(
     helix_radius: float,
     target_depth: float,
     helix_pitch: float,
     plunge_rate: float,
+    transition_feed: float,
     approach_angle: float = 90,
-    end_feed: Optional[float] = None
+    helix_end_feed: Optional[float] = None,
+    transition: str = 'none',
+    cut_radius: Optional[float] = None,
+    target_point: Optional[Tuple[float, float]] = None,
+    center: Optional[Tuple[float, float]] = None,
+    relative_z: bool = False,
 ) -> List[str]:
     """
-    Generate G-code for helical lead-in (spiral descent).
+    Generate G-code for helical entry: helix descent + optional transition to profile.
 
-    Uses clockwise (G02) arcs with Z movement to spiral down into
-    the material. Each full revolution descends by helix_pitch.
+    Consolidates all helical lead-in generation into a single function. Supports
+    both absolute mode (inline cutting with known center) and relative Z mode
+    (subroutines with M98 L-parameter multi-pass).
 
-    Feed rate ramping: If end_feed is provided, the feed rate ramps up
-    in 3 steps (25%, 50%, 75% of the range from plunge_rate to end_feed).
-    The transition arc (generated separately) completes the 4th step at 100%.
-    This provides smooth acceleration as the tool establishes itself.
+    Coordinate modes:
+    - Absolute (center provided): Helix arcs use absolute XY coordinates and
+      absolute Z depths. Used for inline first-pass and _generate_path_cut().
+    - Relative Z (center=None, relative_z=True): Helix arcs use X0 Y0 (return to
+      same position) with G91 relative Z descent. Used for subroutine preambles.
+
+    Transition types:
+    - 'arc': G02 arc from helix radius to cut_radius at the approach angle.
+      In absolute mode, targets absolute XY on the cut profile.
+      In relative_z mode, uses G91 delta XY.
+    - 'linear': G01 move to target_point (always absolute XY).
+    - 'none': No transition move after helix descent.
+
+    Feed rate ramping: Helix revolutions ramp from plunge_rate toward
+    helix_end_feed (or transition_feed if helix_end_feed is None) using
+    calculate_ramped_helix_feed() (25%/50%/75% steps). The transition move
+    uses transition_feed.
 
     Args:
-        center_x: Helix center X coordinate
-        center_y: Helix center Y coordinate
-        helix_radius: Radius of the helix
-        target_depth: Depth to descend (positive value, will be negated)
+        helix_radius: Radius of the helical descent
+        target_depth: Depth to descend (positive value, negated internally)
         helix_pitch: Z drop per revolution
         plunge_rate: Starting feed rate for the helical descent
+        transition_feed: Feed rate for the transition move to profile
         approach_angle: Direction tool approaches from in degrees (0=top, 90=right)
-                       Default 90° matches original 3 o'clock position
-        end_feed: Optional ending feed rate. If provided, feed ramps in steps
-                 of 25%, 50%, 75% toward end_feed (transition arc does 100%).
-                 If None, uses plunge_rate throughout.
+        helix_end_feed: Target feed for helix ramp steps. If None, uses transition_feed.
+        transition: Type of transition: 'arc', 'linear', or 'none'
+        cut_radius: Profile radius for arc transition (required when transition='arc')
+        target_point: (x, y) for linear transition (required when transition='linear')
+        center: (x, y) helix center for absolute mode. None = relative Z mode.
+        relative_z: If True and center is None, wrap helix in G91/G90.
 
     Returns:
         List of G-code command strings
     """
     lines = []
+
+    # Determine the feed rate that helix revolutions ramp toward
+    ramp_target = helix_end_feed if helix_end_feed is not None else transition_feed
+
+    # Derive transition feed from cutting feed (80% for gentle profile approach)
+    if helix_end_feed is not None:
+        transition_feed = helix_end_feed * 0.8
 
     # Calculate number of revolutions
     revolutions = calculate_helix_revolutions(target_depth, helix_pitch)
-
-    # Convert user angle to math angle
-    math_angle = _user_angle_to_math_angle(approach_angle)
-
-    # Start point is at the approach angle position
-    start_x = center_x + helix_radius * math.cos(math_angle)
-    start_y = center_y + helix_radius * math.sin(math_angle)
-
-    # I/J offset is from current position to center (always points toward center)
-    i_offset = -helix_radius * math.cos(math_angle)
-    j_offset = -helix_radius * math.sin(math_angle)
-
-    # Descend in full revolutions with 4-step feed ramping (helix gets steps 1-3)
-    # Step 1: 25%, Step 2: 50%, Step 3: 75%, Step 4 (transition arc): 100%
-    current_depth = 0
     depth_per_rev = target_depth / revolutions
 
-    for rev in range(revolutions):
-        current_depth += depth_per_rev
-
-        # Calculate stepped feed rate for this revolution
-        if end_feed is not None:
-            current_feed = calculate_ramped_helix_feed(rev, revolutions, plunge_rate, end_feed)
-        else:
-            current_feed = plunge_rate
-
-        # G02 full circle with Z descent
-        # End point is same as start (full circle)
-        lines.append(generate_arc_move(
-            "G02",
-            start_x, start_y,
-            i_offset, j_offset,
-            feed=current_feed,
-            z=-current_depth
-        ))
-
-    return lines
-
-
-def generate_helical_preamble(
-    center_x: float,
-    center_y: float,
-    helix_radius: float,
-    pass_depth: float,
-    helix_pitch: float,
-    plunge_rate: float,
-    approach_angle: float = 90
-) -> List[str]:
-    """
-    Generate preamble for helical lead-in in subroutines.
-
-    Uses relative coordinates for Z descent so the subroutine can be
-    called multiple times with L parameter. After helix, switches back
-    to absolute mode.
-
-    Args:
-        center_x: Helix center X coordinate
-        center_y: Helix center Y coordinate
-        helix_radius: Radius of the helix
-        pass_depth: Depth increment per pass
-        helix_pitch: Z drop per revolution
-        plunge_rate: Feed rate for the helical descent
-        approach_angle: Direction tool approaches from in degrees (0=top, 90=right)
-                       Default 90° matches original 3 o'clock position
-
-    Returns:
-        List of G-code command strings
-    """
-    lines = []
-
-    # Start at Z0
-    lines.append("G00 Z0")
-
-    # Calculate revolutions for this pass depth
-    revolutions = calculate_helix_revolutions(pass_depth, helix_pitch)
-    depth_per_rev = pass_depth / revolutions
-
     # Convert user angle to math angle
     math_angle = _user_angle_to_math_angle(approach_angle)
 
-    # Start point at approach angle position
-    start_x = center_x + helix_radius * math.cos(math_angle)
-    start_y = center_y + helix_radius * math.sin(math_angle)
+    # I/J offset from start position to center (always points toward center)
     i_offset = -helix_radius * math.cos(math_angle)
     j_offset = -helix_radius * math.sin(math_angle)
 
-    # Switch to relative mode for Z
-    lines.append("G91")
+    if center is not None:
+        # Absolute mode: helix arcs use absolute XY + Z coordinates
+        start_x = center[0] + helix_radius * math.cos(math_angle)
+        start_y = center[1] + helix_radius * math.sin(math_angle)
 
-    # Helical descent
-    for rev in range(revolutions):
+        current_depth = 0
+        for rev in range(revolutions):
+            current_depth += depth_per_rev
+            current_feed = calculate_ramped_helix_feed(rev, revolutions, plunge_rate, ramp_target)
+            lines.append(generate_arc_move(
+                "G02", start_x, start_y,
+                i_offset, j_offset,
+                feed=current_feed, z=-current_depth
+            ))
+    else:
+        # Relative Z mode: X0 Y0 (full circle back to same position)
+        if relative_z:
+            lines.append("G91")
+
+        for rev in range(revolutions):
+            current_feed = calculate_ramped_helix_feed(rev, revolutions, plunge_rate, ramp_target)
+            lines.append(
+                f"G02 X0 Y0 Z{format_coordinate(-depth_per_rev)} "
+                f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(current_feed, 1)}"
+            )
+
+        if relative_z:
+            lines.append("G90")
+
+    # Transition to profile
+    if transition == 'arc' and cut_radius is not None:
+        if abs(helix_radius - cut_radius) > 0.001:
+            if center is not None:
+                # Absolute mode: arc to absolute target on cut profile
+                target_x = center[0] + cut_radius * math.cos(math_angle)
+                target_y = center[1] + cut_radius * math.sin(math_angle)
+                lines.append(generate_arc_move(
+                    "G02", target_x, target_y,
+                    i_offset, j_offset,
+                    feed=transition_feed
+                ))
+            else:
+                # Relative mode: delta XY from helix to cut profile
+                delta_x = (cut_radius - helix_radius) * math.cos(math_angle)
+                delta_y = (cut_radius - helix_radius) * math.sin(math_angle)
+                lines.append("G91")
+                lines.append(
+                    f"G02 X{format_coordinate(delta_x)} Y{format_coordinate(delta_y)} "
+                    f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(transition_feed, 1)}"
+                )
+                lines.append("G90")
+
+    elif transition == 'linear' and target_point is not None:
+        # Linear move to target point (always absolute)
         lines.append(
-            f"G02 X{format_coordinate(start_x)} Y{format_coordinate(start_y)} "
-            f"Z{format_coordinate(-depth_per_rev)} I{format_coordinate(i_offset)} "
-            f"J{format_coordinate(j_offset)} F{format_coordinate(plunge_rate, 1)}"
+            f"G01 X{format_coordinate(target_point[0])} Y{format_coordinate(target_point[1])} "
+            f"F{format_coordinate(transition_feed, 1)}"
         )
 
-    # Switch back to absolute mode
-    lines.append("G90")
-
     return lines
-
-
-def generate_helical_to_profile_circle(
-    center_x: float,
-    center_y: float,
-    helix_radius: float,
-    cut_radius: float,
-    feed_rate: float,
-    approach_angle: float = 90
-) -> List[str]:
-    """
-    Generate G-code to transition from helix end to circle profile.
-
-    After helical descent, the tool is at the helix start point at the
-    approach angle. This generates an arc to move tangentially onto the
-    larger circle profile.
-
-    Args:
-        center_x: Circle center X coordinate
-        center_y: Circle center Y coordinate
-        helix_radius: Radius of the helix (where tool currently is)
-        cut_radius: Radius of the toolpath to cut
-        feed_rate: Feed rate for the transition arc
-        approach_angle: Direction tool approaches from in degrees (0=top, 90=right)
-                       Default 90° matches original 3 o'clock position
-
-    Returns:
-        List of G-code command strings
-    """
-    # If helix_radius equals cut_radius, no transition needed
-    if abs(helix_radius - cut_radius) < 0.001:
-        return []
-
-    # Convert user angle to math angle
-    math_angle = _user_angle_to_math_angle(approach_angle)
-
-    # Current position: at approach angle on helix radius
-    # Target position: at same approach angle on cut radius
-
-    # Arc from helix to profile (expand outward)
-    # Use G02 (CW) arc with center at circle center
-    lines = []
-    target_x = center_x + cut_radius * math.cos(math_angle)
-    target_y = center_y + cut_radius * math.sin(math_angle)
-
-    # I/J from current position to arc center
-    i_offset = -helix_radius * math.cos(math_angle)
-    j_offset = -helix_radius * math.sin(math_angle)
-
-    lines.append(generate_arc_move(
-        "G02",
-        target_x, target_y,
-        i_offset, j_offset,
-        feed=feed_rate
-    ))
-
-    return lines
-
-
-def generate_helical_to_profile_hexagon(
-    helix_end_x: float,
-    helix_end_y: float,
-    first_vertex_x: float,
-    first_vertex_y: float,
-    feed_rate: float,
-    approach_angle: float = 90
-) -> List[str]:
-    """
-    Generate G-code to transition from helix end to hexagon first vertex.
-
-    After helical descent at the hexagon center, the tool moves linearly
-    to the first vertex of the hexagon to begin the cut.
-
-    Args:
-        helix_end_x: X coordinate at end of helix
-        helix_end_y: Y coordinate at end of helix
-        first_vertex_x: X coordinate of first hexagon vertex
-        first_vertex_y: Y coordinate of first hexagon vertex
-        feed_rate: Feed rate for the linear move
-        approach_angle: Direction tool approaches from in degrees (for future use)
-
-    Returns:
-        List of G-code command strings
-    """
-    # Note: helix_end_x/y are already calculated based on approach_angle
-    # so this function just needs to do the linear transition
-    return [
-        f"G01 X{format_coordinate(first_vertex_x)} Y{format_coordinate(first_vertex_y)} "
-        f"F{format_coordinate(feed_rate, 1)}"
-    ]
 
 
 def adjust_helix_depth(
@@ -819,7 +723,7 @@ def adjust_helix_depth(
     depth for multi-pass operations.
 
     Args:
-        helix_lines: G-code lines from generate_helical_lead_in
+        helix_lines: G-code lines from generate_helical_entry
         pass_depth: The per-pass depth used when generating helix_lines
         cumulative_depth: The actual cumulative depth to use
 

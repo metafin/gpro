@@ -8,7 +8,7 @@ from src.utils.lead_in import (
     calculate_helix_start_point,
     calculate_hexagon_lead_in_point,
     calculate_line_lead_in_point,
-    generate_helical_lead_in
+    generate_helical_entry
 )
 
 
@@ -254,16 +254,17 @@ class TestLineLeadInPoint:
 
 
 class TestHelicalLeadInGcode:
-    """Tests for generate_helical_lead_in() with approach angle."""
+    """Tests for generate_helical_entry() with approach angle."""
 
     def test_default_angle_90_has_negative_i_offset(self):
         """Default 90° should produce G02 commands with negative I offset."""
-        lines = generate_helical_lead_in(
-            center_x=5.0, center_y=5.0,
+        lines = generate_helical_entry(
             helix_radius=0.5,
             target_depth=0.1,
             helix_pitch=0.04,
-            plunge_rate=10
+            plunge_rate=10,
+            transition_feed=10,
+            center=(5.0, 5.0),
         )
 
         # Check that G02 commands exist with I offset
@@ -276,13 +277,14 @@ class TestHelicalLeadInGcode:
 
     def test_angle_0_has_negative_j_offset(self):
         """0° angle should produce G02 commands with negative J offset."""
-        lines = generate_helical_lead_in(
-            center_x=5.0, center_y=5.0,
+        lines = generate_helical_entry(
             helix_radius=0.5,
             target_depth=0.1,
             helix_pitch=0.04,
             plunge_rate=10,
-            approach_angle=0
+            transition_feed=10,
+            approach_angle=0,
+            center=(5.0, 5.0),
         )
 
         g02_lines = [line for line in lines if line.startswith('G02')]

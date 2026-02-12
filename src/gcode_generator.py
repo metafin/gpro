@@ -35,6 +35,7 @@ from .utils.subroutine_generator import (
 )
 from .utils.validators import validate_arc_geometry
 from .utils.lead_in import (
+    _user_angle_to_math_angle,
     calculate_lead_in_distance,
     calculate_circle_lead_in_point,
     calculate_hexagon_lead_in_point,
@@ -43,9 +44,7 @@ from .utils.lead_in import (
     calculate_helix_radius_for_circle,
     calculate_helix_radius_for_hexagon,
     calculate_helix_start_point,
-    generate_helical_lead_in,
-    generate_helical_to_profile_circle,
-    generate_helical_to_profile_hexagon,
+    generate_helical_entry,
     adjust_helix_depth
 )
 from .utils.corner_detection import generate_corner_slowdown_points
@@ -284,42 +283,35 @@ class WebGCodeGenerator:
 
             # Execute lead-in based on type
             if lead_in.lead_in_type == 'helical' and lead_in.helix_center and lead_in.helix_radius:
-                # Helical descent with feed ramping from plunge_rate to current_feed
-                helix_lines = generate_helical_lead_in(
-                    lead_in.helix_center[0], lead_in.helix_center[1],
-                    lead_in.helix_radius, actual_pass_depth,
-                    lead_in.helix_pitch, params.plunge_rate,
-                    approach_angle, end_feed=current_feed
-                )
-                lines.extend(adjust_helix_depth(helix_lines, actual_pass_depth, current_depth))
+                # Determine transition type and parameters
+                transition = 'none'
+                cut_radius = None
+                target_point = None
 
-                # Transition to profile (at current_feed since helix ramped up to it)
                 if lead_in.profile_transition == 'arc' and lead_in.profile_transition_target:
-                    # Arc transition (for circles) - calculate profile radius from target
                     target_x, target_y = lead_in.profile_transition_target
                     cx, cy = lead_in.helix_center
-                    profile_radius = math.sqrt((target_x - cx) ** 2 + (target_y - cy) ** 2)
-                    # Only add arc if helix radius differs from profile radius
-                    if abs(lead_in.helix_radius - profile_radius) > 0.001:
-                        arc_lines = generate_helical_to_profile_circle(
-                            cx, cy,
-                            lead_in.helix_radius, profile_radius, current_feed,
-                            approach_angle
-                        )
-                        lines.extend(arc_lines)
+                    cut_radius = math.sqrt((target_x - cx) ** 2 + (target_y - cy) ** 2)
+                    transition = 'arc'
                 elif lead_in.profile_transition == 'linear' and lead_in.profile_transition_target:
-                    # Linear transition (for hexagons)
-                    target_x, target_y = lead_in.profile_transition_target
-                    helix_start_x, helix_start_y = calculate_helix_start_point(
-                        lead_in.helix_center[0], lead_in.helix_center[1],
-                        lead_in.helix_radius, approach_angle
-                    )
-                    hex_to_vertex = generate_helical_to_profile_hexagon(
-                        helix_start_x, helix_start_y,
-                        target_x, target_y, current_feed,
-                        approach_angle
-                    )
-                    lines.extend(hex_to_vertex)
+                    target_point = lead_in.profile_transition_target
+                    transition = 'linear'
+
+                # Helical descent + transition, then adjust Z for cumulative depth
+                helix_lines = generate_helical_entry(
+                    helix_radius=lead_in.helix_radius,
+                    target_depth=actual_pass_depth,
+                    helix_pitch=lead_in.helix_pitch,
+                    plunge_rate=params.plunge_rate,
+                    transition_feed=params.plunge_rate,
+                    approach_angle=approach_angle,
+                    helix_end_feed=current_feed,
+                    transition=transition,
+                    cut_radius=cut_radius,
+                    target_point=target_point,
+                    center=lead_in.helix_center,
+                )
+                lines.extend(adjust_helix_depth(helix_lines, actual_pass_depth, current_depth))
 
             elif lead_in.lead_in_type == 'ramp' and lead_in.lead_in_point:
                 # Ramp from lead-in to profile start while descending
@@ -995,9 +987,6 @@ class WebGCodeGenerator:
         Returns:
             List of G-code lines for the first pass (no retract at end)
         """
-        from .utils.lead_in import _user_angle_to_math_angle, calculate_helix_revolutions
-        from .utils.gcode_format import calculate_ramped_helix_feed
-
         lines = []
         cx, cy = circle['center_x'], circle['center_y']
 
@@ -1015,40 +1004,18 @@ class WebGCodeGenerator:
         # Entry based on lead-in type
         if effective_lead_in_type == 'helical' and helix_radius is not None and helix_radius > 0:
             # Helical lead-in: spiral down then arc to profile
-            # Calculate revolutions for this pass depth
-            revolutions = calculate_helix_revolutions(pass_depth, self.settings.helix_pitch)
-            depth_per_rev = pass_depth / revolutions
-
-            # I/J offset from helix start to center
-            i_offset = -helix_radius * math.cos(math_angle)
-            j_offset = -helix_radius * math.sin(math_angle)
-
-            # Switch to relative mode for Z
-            lines.append("G91")
-
-            # Helical descent with feed ramping to first_pass_arc_feed (not full arc_feed)
-            for rev in range(revolutions):
-                current_feed = calculate_ramped_helix_feed(
-                    rev, revolutions, params.plunge_rate, first_pass_arc_feed
-                )
-                lines.append(
-                    f"G02 X0 Y0 Z{format_coordinate(-depth_per_rev)} "
-                    f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(current_feed, 1)}"
-                )
-
-            # Switch back to absolute mode
-            lines.append("G90")
-
-            # Arc to cut profile if helix radius differs from cut radius
-            if abs(helix_radius - cut_radius) > 0.001:
-                delta_x = (cut_radius - helix_radius) * math.cos(math_angle)
-                delta_y = (cut_radius - helix_radius) * math.sin(math_angle)
-                lines.append("G91")
-                lines.append(
-                    f"G02 X{format_coordinate(delta_x)} Y{format_coordinate(delta_y)} "
-                    f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(first_pass_arc_feed, 1)}"
-                )
-                lines.append("G90")
+            lines.extend(generate_helical_entry(
+                helix_radius=helix_radius,
+                target_depth=pass_depth,
+                helix_pitch=self.settings.helix_pitch,
+                plunge_rate=params.plunge_rate,
+                transition_feed=params.plunge_rate,
+                approach_angle=approach_angle,
+                helix_end_feed=first_pass_arc_feed,
+                transition='arc',
+                cut_radius=cut_radius,
+                relative_z=True,
+            ))
 
         elif effective_lead_in_type == 'ramp' and self.lead_in_distance > 0:
             # Ramp lead-in: start at lead-in point, ramp to profile start
@@ -1286,9 +1253,6 @@ class WebGCodeGenerator:
         Returns:
             List of G-code lines for the first pass (no retract at end)
         """
-        from .utils.lead_in import _user_angle_to_math_angle, calculate_helix_revolutions
-        from .utils.gcode_format import calculate_ramped_helix_feed
-
         lines = []
         cx, cy = hexagon['center_x'], hexagon['center_y']
         profile_start_x, profile_start_y = vertices[0]
@@ -1309,35 +1273,18 @@ class WebGCodeGenerator:
         # Entry based on lead-in type
         if effective_lead_in_type == 'helical' and helix_radius is not None and helix_radius > 0:
             # Helical lead-in: spiral down at center, then linear to first vertex
-            # Calculate revolutions for this pass depth
-            revolutions = calculate_helix_revolutions(pass_depth, self.settings.helix_pitch)
-            depth_per_rev = pass_depth / revolutions
-
-            # I/J offset from helix start to center
-            i_offset = -helix_radius * math.cos(math_angle)
-            j_offset = -helix_radius * math.sin(math_angle)
-
-            # Switch to relative mode for Z
-            lines.append("G91")
-
-            # Helical descent with feed ramping to first_pass_arc_feed
-            for rev in range(revolutions):
-                current_feed = calculate_ramped_helix_feed(
-                    rev, revolutions, params.plunge_rate, first_pass_arc_feed
-                )
-                lines.append(
-                    f"G02 X0 Y0 Z{format_coordinate(-depth_per_rev)} "
-                    f"I{format_coordinate(i_offset)} J{format_coordinate(j_offset)} F{format_coordinate(current_feed, 1)}"
-                )
-
-            # Switch back to absolute mode
-            lines.append("G90")
-
-            # Linear move from helix end to first vertex at first pass feed
-            lines.append(
-                f"G01 X{format_coordinate(profile_start_x)} Y{format_coordinate(profile_start_y)} "
-                f"F{format_coordinate(first_pass_feed, 1)}"
-            )
+            lines.extend(generate_helical_entry(
+                helix_radius=helix_radius,
+                target_depth=pass_depth,
+                helix_pitch=self.settings.helix_pitch,
+                plunge_rate=params.plunge_rate,
+                transition_feed=params.plunge_rate,
+                approach_angle=approach_angle,
+                helix_end_feed=first_pass_arc_feed,
+                transition='linear',
+                target_point=(profile_start_x, profile_start_y),
+                relative_z=True,
+            ))
             # Track helix end position for lead-out
             helix_end_x = cx + helix_radius * math.cos(math_angle)
             helix_end_y = cy + helix_radius * math.sin(math_angle)

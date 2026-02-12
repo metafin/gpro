@@ -46,7 +46,7 @@ from src.utils.lead_in import (
     calculate_helix_radius_for_hexagon,
     calculate_helix_start_point,
     calculate_helix_revolutions,
-    generate_helical_lead_in,
+    generate_helical_entry,
     MIN_HELIX_RADIUS
 )
 from src.utils.corner_detection import (
@@ -1587,15 +1587,15 @@ class TestHelicalLeadIn:
         revolutions = calculate_helix_revolutions(0.1, 0)
         assert revolutions == 1
 
-    def test_generate_helical_lead_in_output(self):
-        """Test helical lead-in G-code generation."""
-        lines = generate_helical_lead_in(
-            center_x=5.0,
-            center_y=5.0,
+    def test_generate_helical_entry_output(self):
+        """Test helical entry G-code generation."""
+        lines = generate_helical_entry(
             helix_radius=0.1,
             target_depth=0.08,
             helix_pitch=0.04,
-            plunge_rate=8.0
+            plunge_rate=8.0,
+            transition_feed=8.0,
+            center=(5.0, 5.0),
         )
 
         assert len(lines) > 0
@@ -1606,6 +1606,296 @@ class TestHelicalLeadIn:
             assert 'I' in line
             assert 'J' in line
             assert 'F' in line
+
+
+class TestHelicalEntry:
+    """Tests for generate_helical_entry() unified helix function."""
+
+    def test_absolute_mode_basic(self):
+        """Test absolute mode: center provided, no transition."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.08,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            center=(5.0, 5.0),
+        )
+        assert len(lines) > 0
+        for line in lines:
+            assert line.startswith('G02')
+            assert 'Z' in line
+            assert 'I' in line
+            assert 'J' in line
+
+    def test_absolute_mode_produces_absolute_z(self):
+        """Absolute mode with center should produce absolute Z coordinates."""
+        lines = generate_helical_entry(
+            helix_radius=0.1, target_depth=0.08,
+            helix_pitch=0.04, plunge_rate=8.0,
+            transition_feed=45.0, approach_angle=90,
+            center=(5.0, 5.0),
+        )
+        # 2 revolutions (0.08 / 0.04), absolute Z should descend
+        assert len(lines) == 2
+        # First rev: Z = -0.04, Second rev: Z = -0.08
+        assert 'Z-0.0400' in lines[0]
+        assert 'Z-0.0800' in lines[1]
+        # Should use absolute XY (not X0 Y0)
+        assert 'X5.1' in lines[0]
+
+    def test_relative_z_mode_basic(self):
+        """Test relative Z mode: no center, relative_z=True wraps in G91/G90."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            relative_z=True,
+        )
+        assert lines[0] == "G91"
+        assert lines[-1] == "G90"
+        # Middle lines should be G02 with X0 Y0
+        for line in lines[1:-1]:
+            assert line.startswith('G02')
+            assert 'X0' in line
+            assert 'Y0' in line
+
+    def test_relative_z_mode_no_g91_when_false(self):
+        """Without relative_z, no G91/G90 wrapping when center is None."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            relative_z=False,
+        )
+        assert lines[0].startswith('G02')
+        assert 'G91' not in lines
+        assert 'G90' not in lines
+
+    def test_arc_transition_absolute(self):
+        """Test arc transition in absolute mode."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            center=(5.0, 5.0),
+            transition='arc',
+            cut_radius=0.5,
+        )
+        # Last line should be the arc transition (G02 without Z)
+        arc_line = lines[-1]
+        assert arc_line.startswith('G02')
+        assert 'Z' not in arc_line
+        assert 'F45.0' in arc_line
+
+    def test_arc_transition_relative(self):
+        """Test arc transition in relative Z mode uses G91 delta."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            relative_z=True,
+            transition='arc',
+            cut_radius=0.5,
+        )
+        # Should have G91..G90 for helix, then G91..G90 for arc transition
+        g91_count = lines.count("G91")
+        g90_count = lines.count("G90")
+        assert g91_count == 2
+        assert g90_count == 2
+
+    def test_arc_transition_skipped_when_radii_equal(self):
+        """No arc transition when helix_radius equals cut_radius."""
+        lines = generate_helical_entry(
+            helix_radius=0.5,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            center=(5.0, 5.0),
+            transition='arc',
+            cut_radius=0.5,
+        )
+        # Only helix lines, no transition
+        for line in lines:
+            assert 'Z' in line  # All lines are helix (have Z)
+
+    def test_linear_transition(self):
+        """Test linear transition to target point."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            center=(5.0, 5.0),
+            transition='linear',
+            target_point=(5.5, 5.0),
+        )
+        # Last line should be G01 linear move to target
+        last = lines[-1]
+        assert last.startswith('G01')
+        assert 'X5.5' in last
+        assert 'F45.0' in last
+
+    def test_feed_ramping(self):
+        """Test that feed rate ramps during helix revolutions."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.12,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            center=(5.0, 5.0),
+        )
+        # 3 revolutions for 0.12/0.04 depth
+        assert len(lines) == 3
+        # Extract feed rates - they should increase
+        feeds = []
+        for line in lines:
+            f_idx = line.index('F')
+            feed_str = line[f_idx + 1:].split()[0]
+            feeds.append(float(feed_str))
+        assert feeds[0] < feeds[1] < feeds[2]
+
+    def test_helix_end_feed_separate_from_transition_feed(self):
+        """helix_end_feed controls ramp target, transition_feed controls transition move."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.04,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            helix_end_feed=36.0,  # Arc-adjusted feed for helix ramp
+            center=(5.0, 5.0),
+            transition='linear',
+            target_point=(5.5, 5.0),
+        )
+        # Helix line ramps toward 36.0, not 45.0
+        helix_line = lines[0]
+        f_idx = helix_line.index('F')
+        helix_feed = float(helix_line[f_idx + 1:].split()[0])
+        # Single revolution = 75% step: 8.0 + (36.0 - 8.0) * 0.75 = 29.0
+        assert abs(helix_feed - 29.0) < 0.1
+
+        # Transition line uses 80% of helix_end_feed (36.0 * 0.9 = 32.4)
+        transition_line = lines[-1]
+        assert 'F28.8' in transition_line
+
+    def test_single_revolution(self):
+        """Test with a single helix revolution."""
+        lines = generate_helical_entry(
+            helix_radius=0.1,
+            target_depth=0.03,
+            helix_pitch=0.04,
+            plunge_rate=8.0,
+            transition_feed=45.0,
+            center=(5.0, 5.0),
+        )
+        assert len(lines) == 1
+        assert lines[0].startswith('G02')
+
+    def test_approach_angle_affects_ij(self):
+        """Different approach angles should produce different I/J offsets."""
+        lines_90 = generate_helical_entry(
+            helix_radius=0.5, target_depth=0.04,
+            helix_pitch=0.04, plunge_rate=8.0,
+            transition_feed=45.0, approach_angle=90,
+            relative_z=True,
+        )
+        lines_0 = generate_helical_entry(
+            helix_radius=0.5, target_depth=0.04,
+            helix_pitch=0.04, plunge_rate=8.0,
+            transition_feed=45.0, approach_angle=0,
+            relative_z=True,
+        )
+        # At 90° (3 o'clock): I should be negative, J ~0
+        helix_90 = lines_90[1]  # Skip G91
+        assert 'I-0.5' in helix_90
+
+        # At 0° (12 o'clock): J should be negative, I ~0
+        helix_0 = lines_0[1]
+        assert 'J-0.5' in helix_0
+
+
+class TestTransitionFeedRate:
+    """Tests that helical transition moves use 80% of cutting feed."""
+
+    def test_circle_preamble_transition_uses_cutting_feed(self):
+        """Circle subroutine preamble: arc transition should use 80% of arc feed."""
+        from src.utils.subroutine_generator import generate_helical_preamble_circle
+
+        lines = generate_helical_preamble_circle(
+            helix_radius=0.1, cut_radius=0.5,
+            pass_depth=0.04, helix_pitch=0.04,
+            plunge_rate=8.0, feed_rate=45.0,
+            approach_angle=90, arc_feed_factor=0.8
+        )
+        # Find the arc transition (G02 without Z, after the G90 that ends the helix)
+        arc_transitions = [l for l in lines if l.startswith('G02') and 'Z' not in l]
+        assert len(arc_transitions) == 1
+        # Should use 90% of arc_feed (36.0 * 0.9 = 32.4)
+        assert 'F28.8' in arc_transitions[0]
+
+    def test_hexagon_preamble_transition_uses_cutting_feed(self):
+        """Hexagon subroutine preamble: linear transition should use 80% of arc feed."""
+        from src.utils.subroutine_generator import generate_helical_preamble_hexagon
+
+        lines = generate_helical_preamble_hexagon(
+            center_x=5.0, center_y=5.0,
+            helix_radius=0.1,
+            first_vertex_x=5.5, first_vertex_y=5.0,
+            pass_depth=0.04, helix_pitch=0.04,
+            plunge_rate=8.0, feed_rate=45.0,
+            approach_angle=90, arc_feed_factor=0.8
+        )
+        # Last line should be G01 linear transition to vertex
+        linear_transition = lines[-1]
+        assert linear_transition.startswith('G01')
+        # Should use 90% of arc_feed (36.0 * 0.9 = 32.4)
+        assert 'F28.8' in linear_transition
+
+    def test_helix_still_ramps_toward_cutting_feed(self):
+        """Helix revolutions should still ramp toward arc_feed, not plunge_rate."""
+        from src.utils.subroutine_generator import generate_helical_preamble_circle
+
+        lines = generate_helical_preamble_circle(
+            helix_radius=0.1, cut_radius=0.5,
+            pass_depth=0.12, helix_pitch=0.04,
+            plunge_rate=8.0, feed_rate=45.0,
+            approach_angle=90, arc_feed_factor=0.8
+        )
+        # 3 revolutions (0.12 / 0.04), helix lines are the G02 with Z
+        helix_lines = [l for l in lines if l.startswith('G02') and 'Z' in l]
+        assert len(helix_lines) == 3
+
+        # Extract feed rates from helix lines
+        feeds = []
+        for line in helix_lines:
+            f_idx = line.index('F')
+            feed_str = line[f_idx + 1:].split()[0]
+            feeds.append(float(feed_str))
+
+        # arc_feed = 45.0 * 0.8 = 36.0
+        # Step 1 (25%): 8 + 0.25 * 28 = 15.0
+        # Step 2 (50%): 8 + 0.50 * 28 = 22.0
+        # Step 3 (75%): 8 + 0.75 * 28 = 29.0
+        assert abs(feeds[0] - 15.0) < 0.1
+        assert abs(feeds[1] - 22.0) < 0.1
+        assert abs(feeds[2] - 29.0) < 0.1
+
+        # Transition should use 90% of arc_feed (36.0 * 0.9 = 32.4)
+        arc_transitions = [l for l in lines if l.startswith('G02') and 'Z' not in l]
+        assert len(arc_transitions) == 1
+        assert 'F28.8' in arc_transitions[0]
 
 
 class TestStepdownValidation:
