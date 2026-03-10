@@ -321,10 +321,13 @@ def generate_peck_drill_subroutine(
     lines.append(f"G00 Z{format_coordinate(travel_height)}")
 
     # Move to next hole position (relative)
-    if axis.lower() == 'x':
-        lines.append(f"G00 X{format_coordinate(spacing)}")
+    # axis may include direction suffix (e.g. 'x+', 'y-')
+    axis_lower = axis.lower().strip()
+    sign = -1 if axis_lower.endswith('-') else 1
+    if axis_lower.startswith('x'):
+        lines.append(f"G00 X{format_coordinate(spacing * sign)}")
     else:
-        lines.append(f"G00 Y{format_coordinate(spacing)}")
+        lines.append(f"G00 Y{format_coordinate(spacing * sign)}")
 
     lines.append("G90")  # Back to absolute mode
 
