@@ -457,6 +457,9 @@ class ProjectEditor {
             }
         } else if (type === 'line') {
             const pointCount = op.points?.length || 0;
+            if (op.type === 'pattern_linear') {
+                return `${op.count} x ${pointCount}-pt cut along ${op.axis.toUpperCase()}${compText}${leadInOverride}`;
+            }
             return `${pointCount} point${pointCount !== 1 ? 's' : ''}${compText}${leadInOverride}`;
         }
         return 'Unknown operation';
@@ -585,7 +588,7 @@ class ProjectEditor {
                 typeSelect.value = operation.lead_in_type || (prefix === 'line' ? 'ramp' : 'helical');
             }
             if (angleInput) {
-                angleInput.value = operation.lead_in_approach_angle || 90;
+                angleInput.value = operation.lead_in_approach_angle != null ? operation.lead_in_approach_angle : 90;
             }
         }
     }
@@ -769,7 +772,8 @@ class ProjectEditor {
         // Read lead-in fields
         const leadInMode = document.getElementById('circleLeadInMode')?.value || 'auto';
         const leadInType = document.getElementById('circleLeadInType')?.value || 'helical';
-        const leadInApproachAngle = parseFloat(document.getElementById('circleLeadInApproachAngle')?.value) || 90;
+        const rawAngle = document.getElementById('circleLeadInApproachAngle')?.value;
+        const leadInApproachAngle = rawAngle !== '' && rawAngle != null ? parseFloat(rawAngle) : 90;
 
         let operation;
         if (this.editingIndex.circle !== null) {
@@ -842,7 +846,8 @@ class ProjectEditor {
         // Read lead-in fields
         const leadInMode = document.getElementById('hexLeadInMode')?.value || 'auto';
         const leadInType = document.getElementById('hexLeadInType')?.value || 'helical';
-        const leadInApproachAngle = parseFloat(document.getElementById('hexLeadInApproachAngle')?.value) || 90;
+        const rawAngle = document.getElementById('hexLeadInApproachAngle')?.value;
+        const leadInApproachAngle = rawAngle !== '' && rawAngle != null ? parseFloat(rawAngle) : 90;
 
         let operation;
         if (this.editingIndex.hex !== null) {
@@ -906,6 +911,12 @@ class ProjectEditor {
         this.resetOperationModal('hex');
     }
 
+    toggleLinePatternFields() {
+        const patternType = document.getElementById('linePatternType').value;
+        document.getElementById('linePatternLinearFields').style.display =
+            patternType === 'linear' ? 'block' : 'none';
+    }
+
     addLinePoint() {
         const container = document.getElementById('linePointsList');
         const index = this.linePointCounter++;
@@ -916,11 +927,11 @@ class ProjectEditor {
                 <div class="row g-2 align-items-end">
                     <div class="col-3">
                         <label class="form-label small">X</label>
-                        <input type="number" class="form-control form-control-sm" name="line_point_x_${index}" step="0.001" placeholder="0.000">
+                        <input type="number" class="form-control form-control-sm" name="line_point_x_${index}" step="0.0001" placeholder="0.0000">
                     </div>
                     <div class="col-3">
                         <label class="form-label small">Y</label>
-                        <input type="number" class="form-control form-control-sm" name="line_point_y_${index}" step="0.001" placeholder="0.000">
+                        <input type="number" class="form-control form-control-sm" name="line_point_y_${index}" step="0.0001" placeholder="0.0000">
                     </div>
                     <div class="col-3">
                         <label class="form-label small">Type</label>
@@ -944,11 +955,11 @@ class ProjectEditor {
                 <div class="row g-2 mt-1 px-2 pb-2 pt-1 rounded arc-fields-${index}" style="display: none; background-color: #f0f0f0;">
                     <div class="col-3">
                         <label class="form-label small text-muted mb-0">Arc Center X</label>
-                        <input type="number" class="form-control form-control-sm" name="line_point_arc_x_${index}" step="0.001">
+                        <input type="number" class="form-control form-control-sm" name="line_point_arc_x_${index}" step="0.0001">
                     </div>
                     <div class="col-3">
                         <label class="form-label small text-muted mb-0">Arc Center Y</label>
-                        <input type="number" class="form-control form-control-sm" name="line_point_arc_y_${index}" step="0.001">
+                        <input type="number" class="form-control form-control-sm" name="line_point_arc_y_${index}" step="0.0001">
                     </div>
                     <div class="col-3">
                         <label class="form-label small text-muted mb-0">Direction</label>
@@ -1099,40 +1110,50 @@ class ProjectEditor {
             return;
         }
 
+        // Read pattern fields
+        const patternType = document.getElementById('linePatternType').value;
+
         // Read lead-in fields
         const leadInMode = document.getElementById('lineLeadInMode')?.value || 'auto';
         const leadInType = document.getElementById('lineLeadInType')?.value || 'ramp';
-        const leadInApproachAngle = parseFloat(document.getElementById('lineLeadInApproachAngle')?.value) || 90;
+        const rawAngle = document.getElementById('lineLeadInApproachAngle')?.value;
+        const leadInApproachAngle = rawAngle !== '' && rawAngle != null ? parseFloat(rawAngle) : 90;
         const holdTime = parseFloat(document.getElementById('lineHoldTime')?.value) || 0;
 
+        let operation;
         if (this.editingIndex.line !== null) {
-            // Update existing operation
-            const existing = this.data.operations.line_cuts[this.editingIndex.line];
-            existing.points = points;
-            existing.compensation = document.getElementById('lineCompensation').value;
-            existing.hold_time = holdTime;
-            existing.lead_in_mode = leadInMode;
-            if (leadInMode === 'manual') {
-                existing.lead_in_type = leadInType;
-                existing.lead_in_approach_angle = leadInApproachAngle;
-            } else {
-                delete existing.lead_in_type;
-                delete existing.lead_in_approach_angle;
-            }
+            operation = this.data.operations.line_cuts[this.editingIndex.line];
         } else {
-            // Add new operation
-            const operation = {
-                id: this.generateId(),
-                points: points,
-                compensation: document.getElementById('lineCompensation').value,
-                hold_time: holdTime,
-                lead_in_mode: leadInMode
-            };
-            if (leadInMode === 'manual') {
-                operation.lead_in_type = leadInType;
-                operation.lead_in_approach_angle = leadInApproachAngle;
-            }
+            operation = { id: this.generateId() };
+        }
 
+        // Set shared fields
+        operation.points = points;
+        operation.compensation = document.getElementById('lineCompensation').value;
+        operation.hold_time = holdTime;
+        operation.lead_in_mode = leadInMode;
+        if (leadInMode === 'manual') {
+            operation.lead_in_type = leadInType;
+            operation.lead_in_approach_angle = leadInApproachAngle;
+        } else {
+            delete operation.lead_in_type;
+            delete operation.lead_in_approach_angle;
+        }
+
+        // Set pattern fields
+        if (patternType === 'linear') {
+            operation.type = 'pattern_linear';
+            operation.axis = document.getElementById('linePatternAxis').value;
+            operation.spacing = parseFloat(document.getElementById('linePatternSpacing').value) || 0.5;
+            operation.count = parseInt(document.getElementById('linePatternCount').value) || 1;
+        } else {
+            operation.type = 'single';
+            delete operation.axis;
+            delete operation.spacing;
+            delete operation.count;
+        }
+
+        if (this.editingIndex.line === null) {
             if (!this.data.operations.line_cuts) {
                 this.data.operations.line_cuts = [];
             }
@@ -1187,6 +1208,16 @@ class ProjectEditor {
             }
         });
 
+        // Set pattern fields
+        const patternType = operation.type === 'pattern_linear' ? 'linear' : 'single';
+        document.getElementById('linePatternType').value = patternType;
+        this.toggleLinePatternFields();
+        if (patternType === 'linear') {
+            document.getElementById('linePatternAxis').value = operation.axis || 'x+';
+            document.getElementById('linePatternSpacing').value = operation.spacing || 0.5;
+            document.getElementById('linePatternCount').value = operation.count || 1;
+        }
+
         // Set compensation value
         document.getElementById('lineCompensation').value = operation.compensation || 'none';
 
@@ -1206,7 +1237,7 @@ class ProjectEditor {
             typeSelect.value = operation.lead_in_type || 'ramp';
         }
         if (angleInput) {
-            angleInput.value = operation.lead_in_approach_angle || 90;
+            angleInput.value = operation.lead_in_approach_angle != null ? operation.lead_in_approach_angle : 90;
         }
 
         // Update modal title and button
@@ -1228,6 +1259,13 @@ class ProjectEditor {
         this.linePointCounter = 0;
         document.getElementById('lineCompensation').value = 'none';
         document.getElementById('lineHoldTime').value = 0;
+
+        // Reset pattern fields
+        document.getElementById('linePatternType').value = 'single';
+        this.toggleLinePatternFields();
+        document.getElementById('linePatternAxis').value = 'x+';
+        document.getElementById('linePatternSpacing').value = '';
+        document.getElementById('linePatternCount').value = 1;
 
         // Reset lead-in fields
         const modeSelect = document.getElementById('lineLeadInMode');

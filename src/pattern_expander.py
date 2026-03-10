@@ -18,20 +18,23 @@ def expand_linear_pattern(
     Args:
         start_x: Starting X coordinate
         start_y: Starting Y coordinate
-        axis: Pattern axis ('x' or 'y')
-        spacing: Distance between points
+        axis: Pattern axis ('x', 'x+', 'x-', 'y', 'y+', 'y-')
+              'x'/'x+' = positive X, 'x-' = negative X
+              'y'/'y+' = positive Y, 'y-' = negative Y
+        spacing: Distance between points (always positive)
         count: Number of points
 
     Returns:
         List of (x, y) coordinate tuples
     """
-    points = []
-    for i in range(count):
-        if axis.lower() == 'x':
-            points.append((start_x + i * spacing, start_y))
-        else:
-            points.append((start_x, start_y + i * spacing))
-    return points
+    axis = axis.lower().strip()
+    # Determine direction multiplier
+    if axis.startswith('x'):
+        sign = -1 if axis.endswith('-') else 1
+        return [(start_x + i * spacing * sign, start_y) for i in range(count)]
+    else:
+        sign = -1 if axis.endswith('-') else 1
+        return [(start_x, start_y + i * spacing * sign) for i in range(count)]
 
 
 def expand_grid_pattern(
@@ -199,6 +202,59 @@ def expand_hexagonal_operations(operations: List[Dict[str, Any]]) -> List[Dict[s
     return hexagons
 
 
+def expand_line_operations(operations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Expand all line cut operations.
+
+    Single line cuts pass through unchanged. Linear patterns duplicate the
+    line cut's points at each offset position along the pattern axis.
+
+    Args:
+        operations: List of line cut dicts from project.operations['line_cuts']
+
+    Returns:
+        List of line cut dicts with points, compensation, and lead-in settings
+    """
+    line_cuts = []
+
+    for op in operations:
+        op_type = op.get('type', 'single')
+
+        # Extract shared settings
+        shared = {
+            'compensation': op.get('compensation', 'none'),
+            'hold_time': op.get('hold_time', 0),
+            'lead_in_mode': op.get('lead_in_mode', 'auto'),
+            'lead_in_type': op.get('lead_in_type', 'ramp'),
+            'lead_in_approach_angle': op.get('lead_in_approach_angle', 90),
+        }
+
+        if op_type == 'single' or op_type not in ('single', 'pattern_linear'):
+            # Pass through unchanged (includes legacy ops without type field)
+            line_cuts.append(op)
+
+        elif op_type == 'pattern_linear':
+            offsets = expand_linear_pattern(
+                0, 0,
+                op['axis'], op['spacing'], op['count']
+            )
+            base_points = op.get('points', [])
+            for dx, dy in offsets:
+                offset_points = []
+                for pt in base_points:
+                    new_pt = dict(pt)
+                    new_pt['x'] = pt['x'] + dx
+                    new_pt['y'] = pt['y'] + dy
+                    if 'arc_center_x' in pt:
+                        new_pt['arc_center_x'] = pt['arc_center_x'] + dx
+                    if 'arc_center_y' in pt:
+                        new_pt['arc_center_y'] = pt['arc_center_y'] + dy
+                    offset_points.append(new_pt)
+                line_cuts.append({**shared, 'points': offset_points})
+
+    return line_cuts
+
+
 def expand_all_operations(operations: Dict[str, List]) -> Dict[str, List]:
     """
     Expand all operations in a project.
@@ -218,5 +274,5 @@ def expand_all_operations(operations: Dict[str, List]) -> Dict[str, List]:
         'drill_points': expand_drill_operations(operations.get('drill_holes', [])),
         'circular_cuts': expand_circular_operations(operations.get('circular_cuts', [])),
         'hexagonal_cuts': expand_hexagonal_operations(operations.get('hexagonal_cuts', [])),
-        'line_cuts': operations.get('line_cuts', [])  # Line cuts don't need expansion
+        'line_cuts': expand_line_operations(operations.get('line_cuts', []))
     }

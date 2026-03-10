@@ -159,7 +159,7 @@
                                     <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_spindle_speed" value="{{ params.get('spindle_speed', '') }}"></td>
                                     <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_feed_rate" step="0.1" value="{{ params.get('feed_rate', '') }}"></td>
                                     <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_plunge_rate" step="0.1" value="{{ params.get('plunge_rate', '') }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_pass_depth" step="0.001" value="{{ params.get('pass_depth', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_1flute_{{ size_key }}_pass_depth" step="any" value="{{ params.get('pass_depth', '') }}"></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -193,7 +193,7 @@
                                     <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_spindle_speed" value="{{ params.get('spindle_speed', '') }}"></td>
                                     <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_feed_rate" step="0.1" value="{{ params.get('feed_rate', '') }}"></td>
                                     <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_plunge_rate" step="0.1" value="{{ params.get('plunge_rate', '') }}"></td>
-                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_pass_depth" step="0.001" value="{{ params.get('pass_depth', '') }}"></td>
+                                    <td><input type="number" class="form-control form-control-sm" name="end_mill_2flute_{{ size_key }}_pass_depth" step="any" value="{{ params.get('pass_depth', '') }}"></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

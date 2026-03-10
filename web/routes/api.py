@@ -92,6 +92,38 @@ def validate_project(project_id):
     return validation_response(errors)
 
 
+@api_bp.route('/projects/multi-preview', methods=['POST'])
+@login_required
+def multi_preview():
+    """Generate SVG previews for multiple projects (for overlay comparison)."""
+    data = request.get_json() or {}
+    project_ids = data.get('project_ids', [])
+
+    if not project_ids:
+        return error_response('No projects selected')
+
+    results = []
+    for pid in project_ids:
+        project = ProjectService.get(pid)
+        if not project:
+            continue
+        try:
+            svg = GCodeService.generate_preview_svg(project)
+            results.append({
+                'project_id': project.id,
+                'name': project.name,
+                'svg': svg
+            })
+        except Exception as e:
+            results.append({
+                'project_id': pid,
+                'name': project.name if project else str(pid),
+                'error': str(e)
+            })
+
+    return success_response(data={'previews': results})
+
+
 @api_bp.route('/materials/<material_id>/gcode-params')
 @login_required
 def get_gcode_params(material_id):

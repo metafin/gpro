@@ -5,19 +5,30 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-folder2-open"></i> Projects</h1>
-    <a href="{{ url_for('projects.new') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> New Project
-    </a>
+    <div class="d-flex gap-2">
+        <button id="multi-preview-btn" class="btn btn-outline-secondary" disabled title="Select projects to preview together">
+            <i class="bi bi-layers"></i> Preview
+        </button>
+        <a href="{{ url_for('projects.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Project
+        </a>
+    </div>
 </div>
 
 {% if projects %}
-<div class="row g-4">
+<div class="mb-3">
+    <input type="text" id="project-search" class="form-control" placeholder="Filter projects by name...">
+</div>
+<div class="row g-4" id="project-grid">
     {% for project in projects %}
-    <div class="col-md-6 col-lg-4">
+    <div class="col-md-6 col-lg-4 project-item" data-name="{{ project.name | lower }}" data-project-id="{{ project.id }}">
         <div class="card project-card h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <h5 class="card-title mb-0">{{ project.name }}</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="checkbox" class="form-check-input project-select-cb" value="{{ project.id }}" title="Select for multi-preview">
+                        <h5 class="card-title mb-0">{{ project.name }}</h5>
+                    </div>
                     {% if project.project_type == 'drill' %}
                     <span class="badge bg-primary">Drill</span>
                     {% else %}
@@ -67,6 +78,27 @@
     </div>
     {% endfor %}
 </div>
+<!-- Multi-Preview Modal -->
+<div class="modal fade" id="multiPreviewModal" tabindex="-1" aria-labelledby="multiPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog" style="max-width: 95vw; max-height: 95vh; margin: 2.5vh auto;">
+        <div class="modal-content" style="height: 95vh;">
+            <div class="modal-header py-2">
+                <h5 class="modal-title" id="multiPreviewModalLabel"><i class="bi bi-layers"></i> Multi-Project Preview</h5>
+                <div class="d-flex align-items-center gap-3 ms-auto me-3">
+                    <div id="multi-preview-legend" class="d-flex gap-3 small"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-2 overflow-auto" id="multi-preview-container" style="position: relative;">
+                <div class="text-center text-muted py-5" id="multi-preview-loading">
+                    <div class="spinner-border" role="status"></div>
+                    <p class="mt-2">Loading previews...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% else %}
 <div class="empty-state">
     <i class="bi bi-folder2-open"></i>
@@ -77,4 +109,165 @@
     </a>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Project search filter
+    const searchInput = document.getElementById('project-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            const items = document.querySelectorAll('.project-item');
+            items.forEach(function(item) {
+                const name = item.dataset.name;
+                item.style.display = (!query || name.includes(query)) ? '' : 'none';
+            });
+        });
+    }
+
+    // Multi-preview selection
+    const previewBtn = document.getElementById('multi-preview-btn');
+    const checkboxes = document.querySelectorAll('.project-select-cb');
+    if (!previewBtn || !checkboxes.length) return;
+
+    function updatePreviewButton() {
+        const checked = document.querySelectorAll('.project-select-cb:checked');
+        previewBtn.disabled = checked.length === 0;
+        previewBtn.textContent = '';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-layers';
+        previewBtn.appendChild(icon);
+        previewBtn.append(checked.length > 0 ? ` Preview (${checked.length})` : ' Preview');
+    }
+
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener('change', updatePreviewButton);
+    });
+
+    // Preview overlay colors for distinguishing projects
+    const overlayColors = ['#2F055A', '#0d6efd', '#dc3545', '#198754', '#fd7e14', '#6f42c1', '#20c997', '#d63384'];
+
+    previewBtn.addEventListener('click', async function() {
+        const selectedIds = Array.from(document.querySelectorAll('.project-select-cb:checked'))
+            .map(cb => cb.value);
+        if (!selectedIds.length) return;
+
+        const modal = new bootstrap.Modal(document.getElementById('multiPreviewModal'));
+        const container = document.getElementById('multi-preview-container');
+        const legend = document.getElementById('multi-preview-legend');
+        const loading = document.getElementById('multi-preview-loading');
+
+        // Reset
+        container.innerHTML = '';
+        container.appendChild(loading);
+        loading.style.display = '';
+        legend.innerHTML = '';
+        modal.show();
+
+        try {
+            const resp = await fetch('/api/projects/multi-preview', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({project_ids: selectedIds})
+            });
+            const result = await resp.json();
+            loading.style.display = 'none';
+
+            if (result.status !== 'ok' || !result.data?.previews?.length) {
+                container.innerHTML = '<p class="text-center text-danger">Failed to load previews.</p>';
+                return;
+            }
+
+            const previews = result.data.previews;
+
+            // Build legend
+            previews.forEach(function(p, i) {
+                if (p.error) return;
+                const color = overlayColors[i % overlayColors.length];
+                const item = document.createElement('span');
+                item.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:' + color + ';margin-right:4px;vertical-align:middle;"></span>' + p.name;
+                legend.appendChild(item);
+            });
+
+            // Create overlay container
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'position:relative;display:inline-block;';
+            container.appendChild(wrapper);
+
+            previews.forEach(function(p, i) {
+                if (p.error) return;
+                const color = overlayColors[i % overlayColors.length];
+
+                // Parse the SVG string
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(p.svg, 'image/svg+xml');
+                const svg = doc.documentElement;
+
+                if (i === 0) {
+                    // First SVG: render as-is (provides the background, grid, material outline)
+                    wrapper.appendChild(svg);
+                } else {
+                    // Subsequent SVGs: overlay with transparent background
+                    svg.style.cssText = 'position:absolute;top:0;left:0;';
+
+                    // Remove background rect (first rect is the background fill)
+                    const rects = svg.querySelectorAll('rect');
+                    if (rects.length > 0 && rects[0].getAttribute('fill') === '#f8f9fa') {
+                        rects[0].setAttribute('fill', 'transparent');
+                    }
+
+                    // Hide grid lines and axis labels (keep material outline and operations)
+                    const lines = svg.querySelectorAll('line');
+                    lines.forEach(function(line) {
+                        if (line.getAttribute('stroke') === '#e9ecef') {
+                            line.style.display = 'none';
+                        }
+                    });
+                    const texts = svg.querySelectorAll('text');
+                    texts.forEach(function(text) {
+                        if (text.getAttribute('fill') === '#6c757d') {
+                            text.style.display = 'none';
+                        }
+                    });
+
+                    wrapper.appendChild(svg);
+                }
+
+                // Recolor operation elements for this project
+                // Circles (drills and circular cuts)
+                svg.querySelectorAll('circle').forEach(function(el) {
+                    const fill = el.getAttribute('fill');
+                    const stroke = el.getAttribute('stroke');
+                    if (fill && fill !== 'none' && fill !== 'transparent' && fill !== '#f8f9fa' && fill !== '#e9ecef' && fill !== '#ff8c00') {
+                        el.setAttribute('fill', color);
+                    }
+                    if (stroke && stroke !== 'none' && stroke !== '#dee2e6' && stroke !== '#ced4da' && stroke !== '#e9ecef' && stroke !== '#cc7000') {
+                        el.setAttribute('stroke', color);
+                    }
+                });
+                // Paths and polygons (line cuts, hexagons)
+                svg.querySelectorAll('path, polygon').forEach(function(el) {
+                    const stroke = el.getAttribute('stroke');
+                    if (stroke && stroke !== 'none' && stroke !== '#dee2e6' && stroke !== '#ced4da') {
+                        el.setAttribute('stroke', color);
+                    }
+                });
+                // Sequence number labels
+                svg.querySelectorAll('text').forEach(function(text) {
+                    const fill = text.getAttribute('fill');
+                    if (fill && fill !== '#6c757d' && fill !== 'none') {
+                        text.setAttribute('fill', color);
+                    }
+                });
+            });
+
+        } catch (err) {
+            loading.style.display = 'none';
+            container.innerHTML = '<p class="text-center text-danger">Error loading previews: ' + err.message + '</p>';
+        }
+    });
+});
+</script>
 {% endblock %}

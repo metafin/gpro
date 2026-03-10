@@ -26,14 +26,14 @@ Expected context variables:
         <div class="col-6">
             <label class="form-label">X</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_x" step="0.001" placeholder="0.000">
+                <input type="number" class="form-control" name="{{ prefix }}_x" step="0.0001" placeholder="0.0000">
                 <span class="input-group-text">in</span>
             </div>
         </div>
         <div class="col-6">
             <label class="form-label">Y</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_y" step="0.001" placeholder="0.000">
+                <input type="number" class="form-control" name="{{ prefix }}_y" step="0.0001" placeholder="0.0000">
                 <span class="input-group-text">in</span>
             </div>
         </div>
@@ -46,14 +46,14 @@ Expected context variables:
         <div class="col-6">
             <label class="form-label">Start X</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_start_x" step="0.001" placeholder="0.000">
+                <input type="number" class="form-control" name="{{ prefix }}_start_x" step="0.0001" placeholder="0.0000">
                 <span class="input-group-text">in</span>
             </div>
         </div>
         <div class="col-6">
             <label class="form-label">Start Y</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_start_y" step="0.001" placeholder="0.000">
+                <input type="number" class="form-control" name="{{ prefix }}_start_y" step="0.0001" placeholder="0.0000">
                 <span class="input-group-text">in</span>
             </div>
         </div>
@@ -62,14 +62,16 @@ Expected context variables:
         <div class="col-4">
             <label class="form-label">Axis</label>
             <select class="form-select" name="{{ prefix }}_axis">
-                <option value="x">Along X</option>
-                <option value="y">Along Y</option>
+                <option value="x+">Along X (positive)</option>
+                <option value="x-">Along X (negative)</option>
+                <option value="y+">Along Y (positive)</option>
+                <option value="y-">Along Y (negative)</option>
             </select>
         </div>
         <div class="col-4">
             <label class="form-label">Spacing</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_spacing" step="0.001" placeholder="0.500">
+                <input type="number" class="form-control" name="{{ prefix }}_spacing" step="0.0001" placeholder="0.500">
                 <span class="input-group-text">in</span>
             </div>
         </div>
@@ -87,14 +89,14 @@ Expected context variables:
         <div class="col-6">
             <label class="form-label">Start X</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_grid_start_x" step="0.001" placeholder="0.000">
+                <input type="number" class="form-control" name="{{ prefix }}_grid_start_x" step="0.0001" placeholder="0.0000">
                 <span class="input-group-text">in</span>
             </div>
         </div>
         <div class="col-6">
             <label class="form-label">Start Y</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_grid_start_y" step="0.001" placeholder="0.000">
+                <input type="number" class="form-control" name="{{ prefix }}_grid_start_y" step="0.0001" placeholder="0.0000">
                 <span class="input-group-text">in</span>
             </div>
         </div>
@@ -103,14 +105,14 @@ Expected context variables:
         <div class="col-6">
             <label class="form-label">X Spacing</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_x_spacing" step="0.001" placeholder="0.500">
+                <input type="number" class="form-control" name="{{ prefix }}_x_spacing" step="0.0001" placeholder="0.500">
                 <span class="input-group-text">in</span>
             </div>
         </div>
         <div class="col-6">
             <label class="form-label">Y Spacing</label>
             <div class="input-group">
-                <input type="number" class="form-control" name="{{ prefix }}_y_spacing" step="0.001" placeholder="0.500">
+                <input type="number" class="form-control" name="{{ prefix }}_y_spacing" step="0.0001" placeholder="0.500">
                 <span class="input-group-text">in</span>
             </div>
         </div>

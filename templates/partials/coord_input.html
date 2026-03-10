@@ -8,13 +8,13 @@ Expected context variables:
 - y_label: Label for Y field (default: "Y")
 - x_value: Initial X value (optional)
 - y_value: Initial Y value (optional)
-- step: Input step value (default: "0.001")
+- step: Input step value (default: "0.0001")
 - required: Whether fields are required (default: true)
 #}
 
 {% set x_label = x_label | default("X") %}
 {% set y_label = y_label | default("Y") %}
-{% set step = step | default("0.001") %}
+{% set step = step | default("0.0001") %}
 {% set required = required | default(true) %}
 
 <div class="coord-input-pair">
@@ -28,7 +28,7 @@ Expected context variables:
                    step="{{ step }}"
                    {% if x_value is defined %}value="{{ x_value }}"{% endif %}
                    {% if required %}required{% endif %}
-                   placeholder="0.000">
+                   placeholder="0.0000">
             <span class="input-group-text">in</span>
         </div>
     </div>
@@ -42,7 +42,7 @@ Expected context variables:
                    step="{{ step }}"
                    {% if y_value is defined %}value="{{ y_value }}"{% endif %}
                    {% if required %}required{% endif %}
-                   placeholder="0.000">
+                   placeholder="0.0000">
             <span class="input-group-text">in</span>
         </div>
     </div>
