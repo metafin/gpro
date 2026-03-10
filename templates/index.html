@@ -24,16 +24,14 @@
     <div class="col-md-6 col-lg-4 project-item" data-name="{{ project.name | lower }}" data-project-id="{{ project.id }}">
         <div class="card project-card h-100">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <input type="checkbox" class="form-check-input project-select-cb" value="{{ project.id }}" title="Select for multi-preview">
-                        <h5 class="card-title mb-0">{{ project.name }}</h5>
-                    </div>
+                <div class="d-flex justify-content-between align-items-start mb-2" style="position:relative;">
+                    <h5 class="card-title mb-0">{{ project.name }}</h5>
                     {% if project.project_type == 'drill' %}
                     <span class="badge bg-primary">Drill</span>
                     {% else %}
                     <span class="badge bg-info">Cut</span>
                     {% endif %}
+                    <input type="checkbox" class="form-check-input project-select-cb" value="{{ project.id }}" title="Select for multi-preview" style="position:absolute;right:0;top:1.75rem;">
                 </div>
 
                 <p class="card-text text-muted small">
